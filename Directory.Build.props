@@ -1,0 +1,21 @@
+<!-- Applies to every project in the repo. NuGet Audit already runs on every restore (since the
+     .NET 8 SDK) and would otherwise only print a warning - this turns a newly disclosed
+     vulnerability into a build failure instead of something that has to be noticed in the
+     output. `all` extends the scan to transitive packages, not just direct references. -->
+<Project>
+  <PropertyGroup>
+    <!-- The .NET code-quality analyzers at Recommended level in every build (see docs/coding-standard.md); rules that do not fit are switched off, with reasons, in .editorconfig. -->
+    <AnalysisMode>Recommended</AnalysisMode>
+    <!-- Zero analyzer findings is the standard, so a new one fails the build instead of piling up (the tools/CodeQuality Refactor tool applies the mechanical fixes). -->
+    <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <WarningsAsErrors>$(WarningsAsErrors);NU1900;NU1901;NU1902;NU1903;NU1904</WarningsAsErrors>
+    <!-- Locks every restore to the exact transitive versions recorded in each project's
+         packages.lock.json, committed to source. Without this, two restores on two different
+         days can silently resolve different transitive versions within the same ranges - a
+         compromised transitive package would slip in with no diff to review. CI restores in
+         locked mode, so a version bump that isn't reflected in the committed lock file fails
+         the build instead of passing quietly. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+</Project>

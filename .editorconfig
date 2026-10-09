@@ -1,0 +1,19 @@
+# Editor and analyzer settings. The .NET analyzers run at "Recommended" level in every build (Directory.Build.props); the rules below do not fit this project, each with its reason.
+root = true
+
+[*.cs]
+# Tests are named as readable sentences with underscores on purpose.
+dotnet_diagnostic.CA1707.severity = none
+# LoggerMessage delegates for every log call: a micro-optimisation that is not worth the ceremony at this volume.
+dotnet_diagnostic.CA1848.severity = none
+dotnet_diagnostic.CA1873.severity = none
+# Constant array arguments: micro-allocation, not a quality problem.
+dotnet_diagnostic.CA1861.severity = none
+# Identifier and type-name conventions aimed at public libraries; this is an application.
+dotnet_diagnostic.CA1716.severity = none
+dotnet_diagnostic.CA1711.severity = none
+# "Could be static" only for private and internal members. A public method on a service that is registered in the container must stay an instance method, or callers cannot substitute, decorate
+# or mock it (dependency inversion, docs/coding-standard.md).
+dotnet_code_quality.CA1822.api_surface = private, internal
+# "Use the concrete type" for speed: trades away programming to interfaces (dependency inversion) for a micro-optimisation that no measurement here has asked for.
+dotnet_diagnostic.CA1859.severity = none

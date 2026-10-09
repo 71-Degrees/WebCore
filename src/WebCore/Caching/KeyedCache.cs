@@ -1,0 +1,171 @@
+/*
+ * ---------------------------------------------------------------------------
+ * Copyright © 2026 71 Degrees. All rights reserved.
+ * ---------------------------------------------------------------------------
+ */
+
+using System.Collections.Concurrent;
+
+namespace WebCore.Caching;
+
+/// <summary>
+/// Many values kept in memory for a short time, one per key (a profile per user, a quiz per id, a search per wording). Same rules as
+/// <see cref="SnapshotCache{T}"/>: counted under a name, callers get their own copy when <c>copy</c> is given, and a value read before a write landed is never stored.
+/// To use it: read <see cref="Generation"/>, load from the real source, then <see cref="Set"/> passing that generation back.
+/// </summary>
+public sealed class KeyedCache<TKey, TValue> where TKey : notnull where TValue : class
+{
+    private readonly CacheCounters _counters;
+    private readonly TimeSpan _timeToLive;
+    private readonly Func<DateTimeOffset> _now;
+    private readonly Func<TValue, TValue>? _copy;
+    private readonly int _maxEntries;
+    private readonly ConcurrentDictionary<TKey, (TValue Value, DateTimeOffset At)> _entries = new();
+
+    private readonly object _inflightGate = new();
+    private readonly Dictionary<TKey, TaskCompletionSource<TValue?>> _inflight = new();
+
+    private int _generation;
+
+    public KeyedCache(string name, TimeSpan timeToLive, Func<DateTimeOffset>? now = null, Func<TValue, TValue>? copy = null, int maxEntries = 1000)
+    {
+        _counters = CacheRegistry.For(name);
+        _timeToLive = timeToLive;
+        _now = now ?? (() => DateTimeOffset.UtcNow);
+        _copy = copy;
+        _maxEntries = maxEntries;
+    }
+
+    /// <summary>Bumped by every invalidation; pass the value read before loading back to <see cref="Set"/>.</summary>
+    public int Generation => Volatile.Read(ref _generation);
+
+    public bool TryGet(TKey key, out TValue value)
+    {
+        if (_entries.TryGetValue(key, out var entry) && _now() - entry.At < _timeToLive)
+        {
+            _counters.Hit();
+            value = _copy is null ? entry.Value : _copy(entry.Value);
+            return true;
+        }
+
+        _counters.Miss();
+        value = null!;
+        return false;
+    }
+
+    public void Set(TKey key, TValue value, int generationBeforeLoad)
+    {
+        if (generationBeforeLoad != Generation)
+        {
+            return;
+        }
+
+        if (_entries.Count >= _maxEntries)
+        {
+            _entries.Clear();
+        }
+
+        _entries[key] = (_copy is null ? value : _copy(value), _now());
+    }
+
+    /// <summary>
+    /// The value for <paramref name="key"/>: from memory when fresh, otherwise loaded with <paramref name="load"/> - and when many callers ask for the same key at once
+    /// (a crowd opening the same quiz) only the first loads and the rest wait for its answer. A null answer is returned but never stored; a failed load is shared with
+    /// the callers that were waiting on it, then forgotten.
+    /// </summary>
+    public async Task<TValue?> GetOrLoadAsync(TKey key, Func<CancellationToken, Task<TValue?>> load, CancellationToken cancellationToken = default)
+    {
+        if (Lookup(key, out var cached))
+        {
+            _counters.Hit();
+            return Out(cached);
+        }
+
+        TaskCompletionSource<TValue?> pending = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!TryLead(key, pending, out var leaderTask))
+        {
+            _counters.Hit(); // shared the leader's read instead of making its own
+            var shared = await leaderTask.ConfigureAwait(false);
+            return shared is null ? null : Out(shared);
+        }
+
+        _counters.Miss();
+        return await LoadAsLeaderAsync(key, pending, load, cancellationToken).ConfigureAwait(false);
+    }
+
+    // The first caller for a key becomes the leader and loads; any caller arriving while it loads gets the leader's task to wait on.
+    private bool TryLead(TKey key, TaskCompletionSource<TValue?> pending, out Task<TValue?> leaderTask)
+    {
+        lock (_inflightGate)
+        {
+            if (_inflight.TryGetValue(key, out var existing))
+            {
+                leaderTask = existing.Task;
+                return false;
+            }
+
+            _inflight[key] = pending;
+            leaderTask = pending.Task;
+            return true;
+        }
+    }
+
+    private async Task<TValue?> LoadAsLeaderAsync(TKey key, TaskCompletionSource<TValue?> pending, Func<CancellationToken, Task<TValue?>> load, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var generation = Generation;
+            var loaded = await load(cancellationToken).ConfigureAwait(false);
+            if (loaded is not null)
+            {
+                Set(key, loaded, generation);
+            }
+
+            pending.SetResult(loaded);
+            return loaded;
+        }
+        catch (Exception ex)
+        {
+            pending.SetException(ex);
+            throw;
+        }
+        finally
+        {
+            lock (_inflightGate)
+            {
+                // Only this call's own entry: an invalidation may already have replaced it with a newer load.
+                if (_inflight.TryGetValue(key, out var current) && ReferenceEquals(current, pending))
+                {
+                    _inflight.Remove(key);
+                }
+            }
+        }
+    }
+
+    public void Invalidate()
+    {
+        Interlocked.Increment(ref _generation);
+        _entries.Clear();
+        lock (_inflightGate)
+        {
+            // Callers arriving after a write must not join a load that started before it.
+            _inflight.Clear();
+        }
+
+        _counters.Invalidated();
+    }
+
+    private bool Lookup(TKey key, out TValue value)
+    {
+        if (_entries.TryGetValue(key, out var entry) && _now() - entry.At < _timeToLive)
+        {
+            value = entry.Value;
+            return true;
+        }
+
+        value = null!;
+        return false;
+    }
+
+    private TValue Out(TValue value) => _copy is null ? value : _copy(value);
+}

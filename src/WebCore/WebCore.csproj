@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The shared web foundations every 71 Degrees app uses: caching building blocks, operations (release notes, server status and the deploy guard), and what grows from there.
+       Apps reference this project through the WebCore submodule so they stay in step. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>WebCore</RootNamespace>
+  </PropertyGroup>
+
+</Project>
