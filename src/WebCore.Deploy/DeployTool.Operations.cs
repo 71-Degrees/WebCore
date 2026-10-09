@@ -183,6 +183,21 @@ internal static partial class DeployTool
         return ReleaseNotesCommand.BackfillTags(RepoRoot(), times, options.Flag("--apply"));
     }
 
+    // sbom: a CycloneDX bill of materials for the web project and what it pulls in, written to sbom/ (gitignored - a snapshot goes stale, so it is made on demand).
+    private static int Sbom()
+    {
+        var root = RepoRoot();
+        if (Run("cmd", "/c where dotnet-CycloneDX").Code != 0)
+        {
+            Console.Error.WriteLine("CycloneDX is not installed. Install it once with: dotnet tool install --global CycloneDX");
+            return 1;
+        }
+
+        var (code, output) = Run("cmd", $"/c dotnet-CycloneDX {Config.WebProject} -o sbom --json", root);
+        Console.WriteLine(code == 0 ? "Wrote sbom/bom.json (gitignored - regenerate on demand)." : output.Trim());
+        return code;
+    }
+
     internal static int Fail(string message)
     {
         Console.Error.WriteLine("ERROR: " + message);

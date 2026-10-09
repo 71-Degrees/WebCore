@@ -23,6 +23,7 @@
 //   deploy install-hooks                                 # installs the pre-push hook that runs check; --no-verify skips it once
 //   deploy setting <stage|prod> Name[=Value]             # read or change one Azure App Setting (restarts the site: waits for live games, then verifies)
 //   deploy console [--port 5098] [--no-open]             # a local page of one-click buttons for the commands above
+//   deploy sbom                                          # a CycloneDX software bill of materials for what ships -> sbom/bom.json (needs: dotnet tool install --global CycloneDX)
 // Building for stage/prod runs the tests first; --skip-tests overrides.
 //
 // Options for any command: --url <base url> --api-key <key> override the target's address and key (to try it against a local server);
@@ -102,6 +103,7 @@ internal static partial class DeployTool
         ["setting"] = SettingCommand.RunAsync,
         ["console"] = ConsoleCommand.RunAsync,
         ["backfill-tags"] = o => Task.FromResult(BackfillTags(o)),
+        ["sbom"] = _ => Task.FromResult(Sbom()),
     };
 
     // ---- targets ---------------------------------------------------------------------------------------------------------------------
