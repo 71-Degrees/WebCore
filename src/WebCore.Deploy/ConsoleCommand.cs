@@ -151,7 +151,19 @@ internal static class ConsoleCommand
         }
 
         Console.WriteLine($"[{DateTime.Now:T}] {action.Label}: {string.Join(' ', action.Args)}");
-        // `dotnet run` and a built Deploy.exe run the launcher's own apphost; `dotnet Deploy.dll` runs it through the dotnet host, which then needs the dll named.
+        using var process = Process.Start(CommandFor(action, root)) ?? throw new InvalidOperationException("Could not start the deploy command.");
+        process.OutputDataReceived += (_, e) => { if (e.Data is not null) { Send(e.Data); } };
+        process.ErrorDataReceived += (_, e) => { if (e.Data is not null) { Send(e.Data); } };
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+        await process.WaitForExitAsync();
+        process.WaitForExit(); // lets the last output events arrive before the exit line
+        Send($"@@EXIT {process.ExitCode}");
+    }
+
+    /// <summary>The launcher run again with the action's arguments. `dotnet run` and a built Deploy.exe run the launcher's own apphost; `dotnet Deploy.dll` runs it through the dotnet host, which then needs the dll named.</summary>
+    private static ProcessStartInfo CommandFor(ConsoleAction action, string root)
+    {
         var host = Environment.ProcessPath ?? "dotnet";
         var info = new ProcessStartInfo(host)
         {
@@ -172,14 +184,7 @@ internal static class ConsoleCommand
             info.ArgumentList.Add(arg);
         }
 
-        using var process = Process.Start(info) ?? throw new InvalidOperationException("Could not start the deploy command.");
-        process.OutputDataReceived += (_, e) => { if (e.Data is not null) { Send(e.Data); } };
-        process.ErrorDataReceived += (_, e) => { if (e.Data is not null) { Send(e.Data); } };
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-        await process.WaitForExitAsync();
-        process.WaitForExit(); // lets the last output events arrive before the exit line
-        Send($"@@EXIT {process.ExitCode}");
+        return info;
     }
 
     private static async Task WriteAsync(HttpListenerContext context, int status, string contentType, string body)
