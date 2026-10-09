@@ -1,10 +1,12 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/WebCore/WebCore.csproj" />
+    <Project Path="src/WebCore.Hosting/WebCore.Hosting.csproj" />
     <Project Path="src/WebCore.Deploy/WebCore.Deploy.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/WebCore.Tests/WebCore.Tests.csproj" />
+    <Project Path="tests/WebCore.Hosting.Tests/WebCore.Hosting.Tests.csproj" />
     <Project Path="tests/WebCore.Deploy.Tests/WebCore.Deploy.Tests.csproj" />
   </Folder>
 </Solution>
