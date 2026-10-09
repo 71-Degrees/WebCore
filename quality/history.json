@@ -1,0 +1,85 @@
+{
+  "Snapshots": [
+    {
+      "At": "2026-10-09 19:41",
+      "Commit": "49814c9",
+      "Note": "",
+      "Smells": {
+        "Total": 12,
+        "Pressure": 13.6,
+        "ByRule": {
+          "Complexity": 2,
+          "DirectClock": 2,
+          "DroppedTask": 1,
+          "LongMethod": 5,
+          "MutableStatic": 2
+        },
+        "PressureByRule": {
+          "Complexity": 2.6,
+          "DirectClock": 2,
+          "DroppedTask": 1,
+          "LongMethod": 6,
+          "MutableStatic": 2
+        }
+      },
+      "Analyzers": {
+        "Total": 1,
+        "Pressure": 0.3,
+        "ByRule": {
+          "build/CS0105": 1
+        },
+        "PressureByRule": {
+          "build/CS0105": 0.3
+        }
+      }
+    },
+    {
+      "At": "2026-10-09 19:43",
+      "Commit": "49814c9",
+      "Note": "",
+      "Smells": {
+        "Total": 3,
+        "Pressure": 3,
+        "ByRule": {
+          "DroppedTask": 1,
+          "MutableStatic": 2
+        },
+        "PressureByRule": {
+          "DroppedTask": 1,
+          "MutableStatic": 2
+        }
+      },
+      "Analyzers": {
+        "Total": 1,
+        "Pressure": 0.3,
+        "ByRule": {
+          "build/CS0105": 1
+        },
+        "PressureByRule": {
+          "build/CS0105": 0.3
+        }
+      }
+    },
+    {
+      "At": "2026-10-09 19:44",
+      "Commit": "49814c9",
+      "Note": "",
+      "Smells": {
+        "Total": 2,
+        "Pressure": 2,
+        "ByRule": {
+          "MutableStatic": 2
+        },
+        "PressureByRule": {
+          "MutableStatic": 2
+        }
+      },
+      "Analyzers": {
+        "Total": 0,
+        "Pressure": 0,
+        "ByRule": {},
+        "PressureByRule": {}
+      }
+    }
+  ]
+}

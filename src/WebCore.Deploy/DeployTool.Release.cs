@@ -20,43 +20,13 @@ internal static partial class DeployTool
     {
         var t = Resolve(options, name);
         var state = LoadState();
-
-        string zip, version;
-        if (options.Value("--zip") is { } explicitZip)
+        var choice = await ChooseBuildAsync(name, options, state);
+        if (choice.Failure is { } failed)
         {
-            zip = explicitZip;
-            version = options.Value("--version") ?? Path.GetFileNameWithoutExtension(zip);
-        }
-        else if (name == "prod" && !options.Flag("--build"))
-        {
-            // Promote: ship exactly what is on staging, so what was tested is what goes live.
-            if (!state.Current.TryGetValue("stage", out var staged))
-            {
-                return Fail("Nothing has been deployed to staging from this machine yet. Run 'stage' first (or use --build to build and ship straight to prod).");
-            }
-
-            var stageUrl = Resolve(options, "stage").Target.Url;
-            var live = await GetVersionAsync(stageUrl);
-            if (live != staged.Version && !options.Flag("--force-untested"))
-            {
-                return Fail($"Staging is running {live ?? "(unreachable)"} but the last build deployed there was {staged.Version}. Test the build you are promoting (or pass --force-untested).");
-            }
-
-            zip = staged.Zip;
-            version = staged.Version;
-            Console.WriteLine($"Promoting build {version}, currently on staging.");
-        }
-        else
-        {
-            var built = Build(options);
-            if (built is null)
-            {
-                return 1;
-            }
-
-            (zip, version) = built.Value;
+            return failed;
         }
 
+        var (zip, version) = (choice.Zip, choice.Version);
         if (!File.Exists(zip))
         {
             return Fail("Build file not found: " + zip);
@@ -76,10 +46,46 @@ internal static partial class DeployTool
 
         if (string.IsNullOrWhiteSpace(t.Target.App))
         {
-            return Fail($"The '{name}' target has no Azure app name yet - fill it in tools/Deploy/targets.json.");
+            return Fail($"The '{name}' target has no Azure app name yet - fill it in deploy/deploy.json.");
         }
 
         return await PushAsync(t, state, zip, version, isRollback: false);
+    }
+
+    /// <summary>What a deploy will ship: a build file given on the command line, the build tested on staging (for production), or a fresh build. <see cref="Failure"/> is the exit code when none could be chosen.</summary>
+    private readonly record struct BuildChoice(int? Failure, string Zip = "", string Version = "");
+
+    private static async Task<BuildChoice> ChooseBuildAsync(string name, Options options, DeployState state)
+    {
+        if (options.Value("--zip") is { } explicitZip)
+        {
+            return new BuildChoice(null, explicitZip, options.Value("--version") ?? Path.GetFileNameWithoutExtension(explicitZip));
+        }
+
+        if (name == "prod" && !options.Flag("--build"))
+        {
+            return await PromoteStagingBuildAsync(options, state);
+        }
+
+        return Build(options) is { } built ? new BuildChoice(null, built.Zip, built.Version) : new BuildChoice(1);
+    }
+
+    // Promote: ship exactly what is on staging, so what was tested is what goes live.
+    private static async Task<BuildChoice> PromoteStagingBuildAsync(Options options, DeployState state)
+    {
+        if (!state.Current.TryGetValue("stage", out var staged))
+        {
+            return new BuildChoice(Fail("Nothing has been deployed to staging from this machine yet. Run 'stage' first (or use --build to build and ship straight to prod)."));
+        }
+
+        var live = await GetVersionAsync(Resolve(options, "stage").Target.Url);
+        if (live != staged.Version && !options.Flag("--force-untested"))
+        {
+            return new BuildChoice(Fail($"Staging is running {live ?? "(unreachable)"} but the last build deployed there was {staged.Version}. Test the build you are promoting (or pass --force-untested)."));
+        }
+
+        Console.WriteLine($"Promoting build {staged.Version}, currently on staging.");
+        return new BuildChoice(null, staged.Zip, staged.Version);
     }
 
     internal static async Task<bool> WaitUntilSafeAsync((string Name, Target Target, Options Options) t, Options options)
@@ -153,9 +159,35 @@ internal static partial class DeployTool
 
     private static async Task<int> PushAsync((string Name, Target Target, Options Options) t, DeployState state, string zip, string version, bool isRollback)
     {
+        if (Upload(t, zip, version) is { } failed)
+        {
+            return failed;
+        }
+
+        Console.WriteLine("Uploaded. Waiting for the new build to answer...");
+        if (!await WaitForBuildAsync(t.Target, version))
+        {
+            Console.Error.WriteLine($"The new build did not report version {version} within 5 minutes. Check {t.Target.Url}{Config.Endpoints.Version} and the Azure log stream; 'rollback {t.Name}' restores the previous build.");
+            return 5;
+        }
+
+        if (state.Current.TryGetValue(t.Name, out var before) && before.Version != version)
+        {
+            state.Previous[t.Name] = before;
+        }
+
+        state.Current[t.Name] = new DeployedBuild(version, zip, DateTimeOffset.UtcNow);
+        SaveState(state);
+        await AfterDeployAsync(t, version, isRollback);
+        return 0;
+    }
+
+    /// <summary>Uploads the build to Azure. Returns null when it went up, otherwise the exit code: 4 when the upload failed, 6 when the "being updated" page could not be taken down afterwards.</summary>
+    private static int? Upload((string Name, Target Target, Options Options) t, string zip, string version)
+    {
         var useOfflinePage = t.Options.Flag("--offline-page");
         var toUpload = useOfflinePage ? WithOfflinePage(zip) : zip;
-        Console.WriteLine($"Deploying {version} to {t.Target.App}{(useOfflinePage ? " (visitors see the 'being updated' page meanwhile)" : "")}...");
+        Console.WriteLine($"Deploying {version} to {t.Target.App}{(useOfflinePage ? " (visitors see the 'being updated' page meanwhile)" : string.Empty)}...");
         var (code, output) = Run("cmd", $"/c az webapp deploy --name {t.Target.App} --resource-group {t.Target.Group} --src-path \"{toUpload}\" --type zip");
         if (useOfflinePage)
         {
@@ -179,49 +211,47 @@ internal static partial class DeployTool
             return 6;
         }
 
-        Console.WriteLine("Uploaded. Waiting for the new build to answer...");
+        return null;
+    }
+
+    /// <summary>Waits up to five minutes for the site to report the build that was just uploaded.</summary>
+    private static async Task<bool> WaitForBuildAsync(Target target, string version)
+    {
         var started = DateTimeOffset.UtcNow;
-        var giveUp = started.AddMinutes(5);
-        while (DateTimeOffset.UtcNow < giveUp)
+        while (DateTimeOffset.UtcNow < started.AddMinutes(5))
         {
-            if (await GetVersionAsync(t.Target.Url) == version)
+            if (await GetVersionAsync(target.Url) == version)
             {
-                Console.WriteLine($"Build {version} is live at {t.Target.Url} (answered {(DateTimeOffset.UtcNow - started).TotalSeconds:N0}s after upload).");
-                if (state.Current.TryGetValue(t.Name, out var before) && before.Version != version)
-                {
-                    state.Previous[t.Name] = before;
-                }
-
-                state.Current[t.Name] = new DeployedBuild(version, zip, DateTimeOffset.UtcNow);
-                SaveState(state);
-                if (t.Name == "prod" && !isRollback)
-                {
-                    ReleaseNotesCommand.TagDeployedBuild(RepoRoot(), version.Split('+').Last(), DateTimeOffset.UtcNow);
-                    await SubmitToIndexNowAsync(RepoRoot(), t.Target.Url);
-                }
-
-                // Time the key pages against the previous build (report-only; --no-perf skips, --strict on `perf` makes a slowdown fail).
-                if (!t.Options.Flag("--no-perf"))
-                {
-                    Console.WriteLine();
-                    await PerfCommands.PerfAsync(t.Name, t.Target, t.Options, expectedVersion: version);
-                }
-
-                // Read what the live site actually says and check what must be closed (report-only here; `verify` itself exits non-zero on a failure).
-                if (!t.Options.Flag("--no-verify"))
-                {
-                    Console.WriteLine();
-                    await VerifyCommands.VerifyAsync(t.Name, t.Target, t.Options, afterDeploy: true);
-                }
-
-                return 0;
+                Console.WriteLine($"Build {version} is live at {target.Url} (answered {(DateTimeOffset.UtcNow - started).TotalSeconds:N0}s after upload).");
+                return true;
             }
 
             await Task.Delay(TimeSpan.FromSeconds(5));
         }
 
-        Console.Error.WriteLine($"The new build did not report version {version} within 5 minutes. Check {t.Target.Url}/version and the Azure log stream; 'rollback {t.Name}' restores the previous build.");
-        return 5;
+        return false;
+    }
+
+    // Tag and announce a production deploy, then time the key pages and read what the live site says (both report-only here; `verify` itself exits non-zero on a failure).
+    private static async Task AfterDeployAsync((string Name, Target Target, Options Options) t, string version, bool isRollback)
+    {
+        if (t.Name == "prod" && !isRollback)
+        {
+            ReleaseNotesCommand.TagDeployedBuild(RepoRoot(), version.Split('+').Last(), DateTimeOffset.UtcNow);
+            await SubmitToIndexNowAsync(RepoRoot(), t.Target.Url);
+        }
+
+        if (!t.Options.Flag("--no-perf"))
+        {
+            Console.WriteLine();
+            await PerfCommands.PerfAsync(t.Name, t.Target, t.Options, expectedVersion: version);
+        }
+
+        if (!t.Options.Flag("--no-verify"))
+        {
+            Console.WriteLine();
+            await VerifyCommands.VerifyAsync(t.Name, t.Target, t.Options, afterDeploy: true);
+        }
     }
 
     // Tells Bing, Yandex and the other IndexNow search engines which pages to re-crawl: submits every URL in the live sitemap. The key

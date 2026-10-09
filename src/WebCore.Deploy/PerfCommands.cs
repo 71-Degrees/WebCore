@@ -43,35 +43,12 @@ internal static class PerfCommands
 
         var version = await VersionAsync(http, baseUrl) ?? "(unknown)";
         Console.WriteLine($"Performance of {name} ({baseUrl}), build {version}, {samples} timed requests per page after one warm-up:");
-
-        var timings = new List<PageTiming>();
-        foreach (var path in DeployTool.Config.PerfPages)
-        {
-            await SafeGet(http, baseUrl + path); // warm-up: the first request after a deploy pays for cold code
-            var times = new List<double>();
-            var status = 0;
-            for (var i = 0; i < samples; i++)
-            {
-                var (code, ms) = await SafeGet(http, baseUrl + path);
-                status = code;
-                times.Add(ms);
-            }
-
-            times.Sort();
-            var timing = new PageTiming(path, status, Percentile(times, 0.5), Percentile(times, 0.95), times[^1]);
-            timings.Add(timing);
-            if (status != 200)
-            {
-                problems.Add($"{path} answered {status}");
-            }
-        }
-
+        var timings = await TimePagesAsync(http, baseUrl, samples, problems);
         await CheckStaticAssets(http, baseUrl, problems);
 
         // A deploy can restart the site a second time after the new build first answers. If the process changed while we were timing, those numbers include the
         // restart's 503s and cold start: measure once more, and if it happens again say so rather than blame the code.
-        var startedAfter = await StartedAtAsync(http, baseUrl);
-        if (startedAt is not null && startedAfter != startedAt)
+        if (startedAt is not null && await StartedAtAsync(http, baseUrl) != startedAt)
         {
             if (attempt == 0)
             {
@@ -84,7 +61,45 @@ internal static class PerfCommands
         }
 
         var history = LoadHistory(name);
-        var previous = history.LastOrDefault(r => r.Version != version);
+        var regressions = PrintComparison(timings, history.LastOrDefault(r => r.Version != version));
+
+        // Keep one run per build (the latest), the last ten builds.
+        history.RemoveAll(r => r.Version == version);
+        history.Add(new PerfRun(version, DateTimeOffset.UtcNow, timings));
+        SaveHistory(name, history.TakeLast(10).ToList());
+        return Conclude(problems, regressions, options.Flag("--strict"));
+    }
+
+    /// <summary>Times each configured page: one warm-up request (the first after a deploy pays for cold code), then the samples. A page that does not answer 200 is a problem.</summary>
+    private static async Task<List<PageTiming>> TimePagesAsync(HttpClient http, string baseUrl, int samples, List<string> problems)
+    {
+        var timings = new List<PageTiming>();
+        foreach (var path in DeployTool.Config.PerfPages)
+        {
+            await SafeGet(http, baseUrl + path);
+            var times = new List<double>();
+            var status = 0;
+            for (var i = 0; i < samples; i++)
+            {
+                var (code, ms) = await SafeGet(http, baseUrl + path);
+                status = code;
+                times.Add(ms);
+            }
+
+            times.Sort();
+            timings.Add(new PageTiming(path, status, Percentile(times, 0.5), Percentile(times, 0.95), times[^1]));
+            if (status != 200)
+            {
+                problems.Add($"{path} answered {status}");
+            }
+        }
+
+        return timings;
+    }
+
+    /// <summary>Prints the timings beside the previous build's and returns the pages that got noticeably slower.</summary>
+    private static List<string> PrintComparison(IReadOnlyList<PageTiming> timings, PerfRun? previous)
+    {
         Console.WriteLine($"  {"page",-14} {"status",6} {"p50 ms",8} {"p95 ms",8} {"max ms",8}   vs {(previous is null ? "(no earlier build recorded)" : previous.Version)}");
         var regressions = new List<string>();
         foreach (var t in timings)
@@ -93,7 +108,7 @@ internal static class PerfCommands
             if (previous?.Pages.FirstOrDefault(p => p.Path == t.Path) is { } before)
             {
                 var delta = t.P50 - before.P50;
-                note = $"{(delta >= 0 ? "+" : "")}{delta:N0} ms";
+                note = $"{(delta >= 0 ? "+" : string.Empty)}{delta:N0} ms";
                 if (t.P50 > before.P50 * RegressionFactor && delta > RegressionMinimumMs)
                 {
                     note += "  <-- SLOWER";
@@ -104,11 +119,11 @@ internal static class PerfCommands
             Console.WriteLine($"  {t.Path,-14} {t.Status,6} {t.P50,8:N0} {t.P95,8:N0} {t.Max,8:N0}   {note}");
         }
 
-        // Keep one run per build (the latest), the last ten builds.
-        history.RemoveAll(r => r.Version == version);
-        history.Add(new PerfRun(version, DateTimeOffset.UtcNow, timings));
-        SaveHistory(name, history.TakeLast(10).ToList());
+        return regressions;
+    }
 
+    private static int Conclude(List<string> problems, List<string> regressions, bool strict)
+    {
         foreach (var problem in problems)
         {
             Console.WriteLine("  PROBLEM: " + problem);
@@ -124,7 +139,7 @@ internal static class PerfCommands
             Console.WriteLine("  No problems, no slowdowns against the previous build.");
         }
 
-        return problems.Count > 0 || (regressions.Count > 0 && options.Flag("--strict")) ? 6 : 0;
+        return problems.Count > 0 || (regressions.Count > 0 && strict) ? 6 : 0;
     }
 
     /// <summary>

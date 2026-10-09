@@ -1,0 +1,3 @@
+[submodule "tools/CodeQuality"]
+	path = tools/CodeQuality
+	url = https://github.com/71-Degrees/CodeQuality.git

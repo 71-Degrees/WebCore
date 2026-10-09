@@ -33,6 +33,12 @@ internal static partial class DeployTool
 
     internal static string RepoRoot()
     {
+        // Tests (and anyone running the tool from elsewhere) can point it at a repository directly.
+        if (Environment.GetEnvironmentVariable("WEBCORE_DEPLOY_ROOT") is { Length: > 0 } fixedRoot && Directory.Exists(fixedRoot))
+        {
+            return fixedRoot;
+        }
+
         foreach (var start in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
         {
             for (var dir = new DirectoryInfo(start); dir is not null; dir = dir.Parent)
@@ -68,16 +74,8 @@ internal static partial class DeployTool
     private static (string Zip, string Version)? Build(Options options)
     {
         var root = RepoRoot();
-        if (!options.Flag("--skip-tests") && !RunChecks(root, includeWebBuild: false))
+        if (!MayBuild(root, options))
         {
-            Console.Error.WriteLine("Not building: the tests must pass first (--skip-tests to override, though you shouldn't).");
-            return null;
-        }
-
-        var (_, dirty) = Run("git", "status --porcelain -- src", root);
-        if (!string.IsNullOrWhiteSpace(dirty) && !options.Flag("--allow-dirty"))
-        {
-            Console.Error.WriteLine("Uncommitted changes under src/ - commit them first so the build matches a commit (or pass --allow-dirty):\n" + dirty.TrimEnd());
             return null;
         }
 
@@ -90,6 +88,30 @@ internal static partial class DeployTool
             return (zip, version);
         }
 
+        return PublishAndZip(root, version, zip, options) ? (zip, version) : null;
+    }
+
+    /// <summary>A build must be of a commit whose tests pass, so the tests run first (--skip-tests overrides) and uncommitted changes under src/ stop it (--allow-dirty overrides).</summary>
+    private static bool MayBuild(string root, Options options)
+    {
+        if (!options.Flag("--skip-tests") && !RunChecks(root, includeWebBuild: false))
+        {
+            Console.Error.WriteLine("Not building: the tests must pass first (--skip-tests to override, though you shouldn't).");
+            return false;
+        }
+
+        var (_, dirty) = Run("git", "status --porcelain -- src", root);
+        if (!string.IsNullOrWhiteSpace(dirty) && !options.Flag("--allow-dirty"))
+        {
+            Console.Error.WriteLine("Uncommitted changes under src/ - commit them first so the build matches a commit (or pass --allow-dirty):\n" + dirty.TrimEnd());
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool PublishAndZip(string root, string version, string zip, Options options)
+    {
         var publishDir = Path.Combine(StateDir(), "publish-tmp");
         if (Directory.Exists(publishDir))
         {
@@ -101,14 +123,14 @@ internal static partial class DeployTool
         if (code != 0)
         {
             Console.Error.WriteLine("dotnet publish failed:\n" + output);
-            return null;
+            return false;
         }
 
         // Smaller css/js for the wire; the source files stay readable. --no-minify skips it.
         if (!options.Flag("--no-minify"))
         {
             var (minifiedFiles, beforeBytes, afterBytes, skippedFiles) = Minifier.MinifyWebRoot(Path.Combine(publishDir, "wwwroot"));
-            Console.WriteLine($"Minified {minifiedFiles} files: {beforeBytes / 1024.0:N1} KB -> {afterBytes / 1024.0:N1} KB{(skippedFiles.Count > 0 ? "; left as is: " + string.Join(", ", skippedFiles) : "")}");
+            Console.WriteLine($"Minified {minifiedFiles} files: {beforeBytes / 1024.0:N1} KB -> {afterBytes / 1024.0:N1} KB{(skippedFiles.Count > 0 ? "; left as is: " + string.Join(", ", skippedFiles) : string.Empty)}");
         }
 
         // The release notes ride along in the build so /admin/releases can show them.
@@ -120,11 +142,7 @@ internal static partial class DeployTool
             symbols.Delete();
         }
 
-        if (File.Exists(zip))
-        {
-            File.Delete(zip);
-        }
-
+        File.Delete(zip);
         ZipFile.CreateFromDirectory(publishDir, zip);
         Directory.Delete(publishDir, recursive: true);
         Console.WriteLine($"Built {zip} ({new FileInfo(zip).Length / 1024.0 / 1024.0:N1} MB)");
@@ -134,7 +152,6 @@ internal static partial class DeployTool
             old.Delete();
         }
 
-        return (zip, version);
+        return true;
     }
-
 }

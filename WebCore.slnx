@@ -5,5 +5,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/WebCore.Tests/WebCore.Tests.csproj" />
+    <Project Path="tests/WebCore.Deploy.Tests/WebCore.Deploy.Tests.csproj" />
   </Folder>
 </Solution>

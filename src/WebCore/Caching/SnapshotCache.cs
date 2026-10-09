@@ -28,11 +28,12 @@ public sealed class SnapshotCache<T> : IDisposable where T : class
     private DateTimeOffset _loadedAt;
     private int _generation;
 
-    public SnapshotCache(string name, TimeSpan timeToLive, Func<DateTimeOffset>? now = null, Func<T, T>? copy = null)
+    /// <param name="now">An older way to control the clock in a test; <paramref name="timeProvider"/> is the standard one and wins when this is not given.</param>
+    public SnapshotCache(string name, TimeSpan timeToLive, Func<DateTimeOffset>? now = null, Func<T, T>? copy = null, TimeProvider? timeProvider = null)
     {
         _counters = CacheRegistry.For(name);
         _timeToLive = timeToLive;
-        _now = now ?? (() => DateTimeOffset.UtcNow);
+        _now = now ?? (timeProvider ?? TimeProvider.System).GetUtcNow;
         _copy = copy;
     }
 

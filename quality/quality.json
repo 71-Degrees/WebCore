@@ -1,0 +1,13 @@
+{
+  "siteName": "WebCore",
+  "solution": "WebCore.slnx",
+  "sourceFolders": [ "src" ],
+  "testFolders": [ "tests" ],
+  "skipFolders": [ "/tools/CodeQuality/" ],
+  // The deploy engine is a command-line tool: the clock and the network are its edges, so reading them directly is the job there.
+  "ruleExemptions": {
+    "DirectClock": [ "/WebCore.Deploy/" ],
+    "DirectHttpClient": [ "/WebCore.Deploy/" ]
+  },
+  "toolCommand": "dotnet run --project tools/CodeQuality/src/Quality --"
+}

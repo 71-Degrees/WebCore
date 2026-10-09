@@ -1,0 +1,6 @@
+{
+  "Entries": {
+    "MutableStatic|src/WebCore/Caching/CacheRegistry.cs|CacheRegistry.Counters": 1,
+    "MutableStatic|src/WebCore/Caching/StorageCalls.cs|StorageCalls.Counts": 1
+  }
+}

@@ -48,9 +48,13 @@ internal static class ConsoleCommand
         while (true)
         {
             var context = await listener.GetContextAsync();
-            _ = Task.Run(() => HandleAsync(context, origin, token, root));
+            Observe(Task.Run(() => HandleAsync(context, origin, token, root)));
         }
     }
+
+    /// <summary>Lets a request run on its own while the listener takes the next one, and makes sure a failure that escapes the handler is reported instead of lost.</summary>
+    private static void Observe(Task request) =>
+        request.ContinueWith(failed => Console.Error.WriteLine("Console request failed: " + failed.Exception?.GetBaseException().Message), TaskContinuationOptions.OnlyOnFaulted);
 
     // The top of this request's code path: whatever goes wrong is logged here and answered, never allowed to stop the listener.
     private static async Task HandleAsync(HttpListenerContext context, string origin, string token, string root)
