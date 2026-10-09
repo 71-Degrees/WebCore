@@ -90,6 +90,11 @@ internal static partial class DeployTool
 
     internal static async Task<bool> WaitUntilSafeAsync((string Name, Target Target, Options Options) t, Options options)
     {
+        if (!Config.LiveSessions)
+        {
+            return true;   // this app has nothing live a restart could interrupt
+        }
+
         var deadline = DateTimeOffset.UtcNow.AddMinutes(options.WaitMinutes());
         var confirmed = options.IntValue("--interrupt");
         while (true)

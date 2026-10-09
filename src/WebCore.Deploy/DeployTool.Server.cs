@@ -66,6 +66,12 @@ internal static partial class DeployTool
 
     private static async Task<int> StatusAsync((string Name, Target Target, Options Options) t)
     {
+        if (!Config.LiveSessions)
+        {
+            Console.WriteLine($"{t.Name} ({t.Target.Url}): version {await GetVersionAsync(t.Target.Url) ?? "(unknown)"}.");
+            return 0;
+        }
+
         var status = await GetStatusAsync(t);
         if (status is null)
         {

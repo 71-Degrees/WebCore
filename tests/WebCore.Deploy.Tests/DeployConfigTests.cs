@@ -45,6 +45,16 @@ public sealed class DeployConfigTests : IDisposable
     }
 
     [Fact]
+    public void LiveSessionsAreAssumedUnlessTheAppSaysItHasNone()
+    {
+        Write("""{ "app": "A", "webProject": "w" }""");
+        Assert.True(DeployConfig.Load(_root).LiveSessions);
+
+        Write("""{ "app": "A", "webProject": "w", "liveSessions": false }""");
+        Assert.False(DeployConfig.Load(_root).LiveSessions);
+    }
+
+    [Fact]
     public void WithNoFileTheMessageSaysWhereToPutOne()
     {
         var error = Assert.Throws<InvalidOperationException>(() => DeployConfig.Load(_root));

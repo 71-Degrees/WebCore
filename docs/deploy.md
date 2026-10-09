@@ -47,6 +47,7 @@ Only `app`, `webProject` and `targets` are required. Comments and trailing comma
     "stage": { "app": "harbor-stage", "group": "rg-harbor", "url": "https://staging.harbor.example", "keyEnv": "HARBOR_IMPORT_KEY" }
   },
   "perfPages": [ "/", "/healthz" ],
+  "liveSessions": true,                     // false for an app with nothing live: no status endpoint needed, deploys never wait
   "verify": {
     "pages": [ { "path": "/", "name": "home page", "contains": [ "Harbor" ] }, { "path": "/about" } ],
     "staticPages": [ "/", "/terms", "/privacy" ],       // must render with no live connection

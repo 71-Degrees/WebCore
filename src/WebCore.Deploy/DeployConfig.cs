@@ -126,6 +126,9 @@ public sealed class DeployConfig
     /// <summary>The pages the perf command times.</summary>
     public string[] PerfPages { get; init; } = { "/", "/healthz" };
 
+    /// <summary>False for an app with no live sessions (no games, no calls): deploys then need no status endpoint and never wait for anyone.</summary>
+    public bool LiveSessions { get; init; } = true;
+
     public VerifySettings Verify { get; init; } = new();
 
     /// <summary>Extra console buttons, after the standard ones.</summary>
