@@ -151,7 +151,9 @@ internal static class ConsoleCommand
         }
 
         Console.WriteLine($"[{DateTime.Now:T}] {action.Label}: {string.Join(' ', action.Args)}");
-        var info = new ProcessStartInfo(Environment.ProcessPath ?? "dotnet")
+        // `dotnet run` and a built Deploy.exe run the launcher's own apphost; `dotnet Deploy.dll` runs it through the dotnet host, which then needs the dll named.
+        var host = Environment.ProcessPath ?? "dotnet";
+        var info = new ProcessStartInfo(host)
         {
             WorkingDirectory = root,
             RedirectStandardOutput = true,
@@ -160,7 +162,11 @@ internal static class ConsoleCommand
             StandardErrorEncoding = Encoding.UTF8,
             UseShellExecute = false,
         };
-        info.ArgumentList.Add(System.Reflection.Assembly.GetEntryAssembly()?.Location ?? throw new InvalidOperationException("Cannot find the deploy launcher to run."));
+        if (Path.GetFileNameWithoutExtension(host).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
+        {
+            info.ArgumentList.Add(System.Reflection.Assembly.GetEntryAssembly()?.Location ?? throw new InvalidOperationException("Cannot find the deploy launcher to run."));
+        }
+
         foreach (var arg in action.Args)
         {
             info.ArgumentList.Add(arg);
