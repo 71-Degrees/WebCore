@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The shared deploy tool engine. An app's tools/Deploy launcher calls DeployApp.RunAsync; deploy/deploy.json in the app holds what differs. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <RootNamespace>WebCore.Deploy</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WebCore\WebCore.csproj" />
+    <PackageReference Include="NUglify" Version="1.23.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The page shown to visitors while the site restarts (the offline-page option). -->
+    <EmbeddedResource Include="app_offline.htm" LogicalName="app_offline.htm" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="WebCore.Deploy.Tests" />
+  </ItemGroup>
+
+</Project>

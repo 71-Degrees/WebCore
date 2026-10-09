@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/WebCore/WebCore.csproj" />
+    <Project Path="src/WebCore.Deploy/WebCore.Deploy.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/WebCore.Tests/WebCore.Tests.csproj" />

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "NUglify": {
+        "type": "Direct",
+        "requested": "[1.23.3, )",
+        "resolved": "1.23.3",
+        "contentHash": "QdHmq6ApqCIxvbGPF4C9gY3A+n0DGsD74Hye0aivvf8hJqBanlsKysqTADSsWdzhvKx+XjG7zXHn/HAV6eLuuQ=="
+      },
+      "webcore": {
+        "type": "Project"
+      }
+    }
+  }
+}
