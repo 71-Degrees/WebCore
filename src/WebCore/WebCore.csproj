@@ -1,12 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The shared web foundations every 71 Degrees app uses: caching building blocks, operations (release notes, server status and the deploy guard), and what grows from there.
-       Apps reference this project through the WebCore submodule so they stay in step. -->
+  <!-- The shared web foundations every 71 Degrees app uses: caching building blocks, rate limiting, operations (release notes, server status and the deploy guard), and the document storage layer
+       (file and blob stores). Apps reference this project through the WebCore submodule so they stay in step. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>WebCore</RootNamespace>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Backs BlobJsonStore, the production document store; only used when Storage:ConnectionString is configured, so local dev keeps the file-backed stores with no Azure dependency. -->
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.29.2" />
+  </ItemGroup>
 
 </Project>
