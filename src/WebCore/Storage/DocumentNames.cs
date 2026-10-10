@@ -11,7 +11,7 @@ namespace WebCore.Storage;
 /// <summary>
 /// The one rule for turning an id into a document name. An id that could escape the folder or container (separators, dots) is refused up front, so no store ever sees one.
 /// </summary>
-internal static partial class DocumentNames
+public static partial class DocumentNames
 {
     [GeneratedRegex("^[A-Za-z0-9_-]+$")]
     private static partial Regex ValidIdPattern();
