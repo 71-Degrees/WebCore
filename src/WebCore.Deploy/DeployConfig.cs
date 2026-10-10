@@ -72,6 +72,25 @@ public sealed class VerifySettings
     public bool SeoFiles { get; init; } = true;
 }
 
+/// <summary>Quieting the "site is down" alert while a deploy restarts the site on purpose (an Azure Monitor alert processing rule that ends by itself).</summary>
+public sealed class AlertQuietSettings
+{
+    /// <summary>The targets whose restarts are quieted (usually only production, which is the one with alerts).</summary>
+    public string[] Targets { get; init; } = { "prod" };
+
+    /// <summary>The names of the alert rules to mute (for example the availability alert).</summary>
+    public string[] Rules { get; init; } = Array.Empty<string>();
+
+    /// <summary>How long the quiet window is while the deploy runs; it ends by itself even if the tool dies.</summary>
+    public int QuietMinutes { get; init; } = 25;
+
+    /// <summary>Once the new build is steady, the window is cut to this many minutes: long enough for the availability samples that failed during the restart to leave the alert's evaluation window.</summary>
+    public int SettleMinutes { get; init; } = 11;
+
+    /// <summary>The processing rule's name. Default: &lt;app&gt;-deploy-quiet.</summary>
+    public string? RuleName { get; init; }
+}
+
 /// <summary>An extra button on the one-click console: the deploy command it runs, and the question to ask first when it changes something live.</summary>
 public sealed class ConsoleActionSettings
 {
@@ -130,6 +149,9 @@ public sealed class DeployConfig
     public bool LiveSessions { get; init; } = true;
 
     public VerifySettings Verify { get; init; } = new();
+
+    /// <summary>Quiets the "site is down" alert during deploys and setting changes. Off when absent.</summary>
+    public AlertQuietSettings? AlertQuiet { get; init; }
 
     /// <summary>Extra console buttons, after the standard ones.</summary>
     public ConsoleActionSettings[] ConsoleActions { get; init; } = Array.Empty<ConsoleActionSettings>();

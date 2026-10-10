@@ -88,6 +88,12 @@ internal static partial class SettingCommand
             return 0;
         }
 
+        // The restart is on purpose, so the "site is down" alert is quieted around it.
+        return await DeployTool.QuietAroundAsync(t.Name, t.Target, options, () => ApplyAsync(t, name, value, options));
+    }
+
+    private static async Task<int> ApplyAsync((string Name, Target Target, Options Options) t, string name, string value, Options options)
+    {
         // -o none: the CLI's default output lists every setting value, secrets included.
         var (code, output) = DeployTool.Run("cmd", $"/c az webapp config appsettings set --name {t.Target.App} --resource-group {t.Target.Group} --settings {name}={value} -o none");
         if (code != 0)

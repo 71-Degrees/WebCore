@@ -162,7 +162,10 @@ internal static partial class DeployTool
         return false;
     }
 
-    private static async Task<int> PushAsync((string Name, Target Target, Options Options) t, DeployState state, string zip, string version, bool isRollback)
+    private static Task<int> PushAsync((string Name, Target Target, Options Options) t, DeployState state, string zip, string version, bool isRollback) =>
+        QuietAroundAsync(t.Name, t.Target, t.Options, () => PushCoreAsync(t, state, zip, version, isRollback));
+
+    private static async Task<int> PushCoreAsync((string Name, Target Target, Options Options) t, DeployState state, string zip, string version, bool isRollback)
     {
         if (Upload(t, zip, version) is { } failed)
         {

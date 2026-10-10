@@ -104,6 +104,7 @@ internal static partial class DeployTool
         ["console"] = ConsoleCommand.RunAsync,
         ["backfill-tags"] = o => Task.FromResult(BackfillTags(o)),
         ["sbom"] = _ => Task.FromResult(Sbom()),
+        ["alerts"] = AlertsAsync,
     };
 
     // ---- targets ---------------------------------------------------------------------------------------------------------------------

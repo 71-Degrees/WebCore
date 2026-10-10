@@ -47,6 +47,7 @@ Only `app`, `webProject` and `targets` are required. Comments and trailing comma
     "stage": { "app": "harbor-stage", "group": "rg-harbor", "url": "https://staging.harbor.example", "keyEnv": "HARBOR_IMPORT_KEY" }
   },
   "perfPages": [ "/", "/healthz" ],
+  "alertQuiet": { "targets": [ "prod" ], "rules": [ "alert-harbor-prod-down" ], "quietMinutes": 25, "settleMinutes": 11 },   // optional: no "site is down" email for a restart the tool caused
   "liveSessions": true,                     // false for an app with nothing live: no status endpoint needed, deploys never wait
   "verify": {
     "pages": [ { "path": "/", "name": "home page", "contains": [ "Harbor" ] }, { "path": "/about" } ],
@@ -74,3 +75,10 @@ The console page can only ask for a button by its id, so what a browser tab can 
 ## Changing the engine
 
 Work in the WebCore repository, keep it app-agnostic (anything specific to one app belongs in its `deploy.json` or its launcher's extensions), keep the wire formats deployed apps already use unchanged, and move each app's submodule pointer when it is ready for the change.
+
+## Quieting the "site is down" alert during a deploy
+
+A deploy restarts the site on purpose, which trips the uptime alert and emails the owner. With `alertQuiet` in `deploy.json`, `stage`/`prod`, `rollback` and `setting` create an Azure Monitor **alert processing rule** (`<App>-deploy-quiet`, scoped to the target's
+resource group and the alert rules you name) that mutes those alerts' notifications for `quietMinutes`. Once the new build is steady the window is cut to `settleMinutes` (long enough for the availability checks that failed during the restart
+to leave the alert's evaluation window); if the deploy fails the rule is removed at once so a real outage alerts. The window always ends by itself, so a tool that dies halfway cannot leave monitoring off. `alerts quiet|resume <target>` does it by hand.
+It needs `az login` with permission to write alert processing rules, and it is off until the setting exists. Alerts about a real outage during the quiet window are muted too, which is why the window is short.
