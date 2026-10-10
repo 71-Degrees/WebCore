@@ -4,8 +4,9 @@ The shared foundations of the 71 Degrees web apps, kept in one private repositor
 
 | Project | What it holds |
 |---|---|
-| `src/WebCore` | Caching building blocks (keyed and snapshot caches with hit/miss counts), operations (release notes from git, server status and the deploy guard), and what grows from there |
-| `src/WebCore.Deploy` | The deploy tool engine (added next): build, stage, promote, rollback, verify, perf, notices, App Settings, the one-click console |
+| `src/WebCore` | Caching building blocks (keyed and snapshot caches with hit/miss counts), operations (release notes from git, server status and the deploy guard), storage (document and binary stores, file and blob, `DocumentRepository`), rate limiting (sliding window, keyed, account attempts) and accessibility (`CssContrast`, a WCAG AA check over a stylesheet) |
+| `src/WebCore.Hosting` | ASP.NET Core hosting pieces: probe-request refusal, the API-key gate, static asset versioning, and `StorageBackend` (blob in production, App_Data folders elsewhere) |
+| `src/WebCore.Deploy` | The deploy tool engine: build, stage, promote, rollback, verify, perf, notices, App Settings, the one-click console |
 
 See `CLAUDE.md` for the engineering standard, and `docs/` for the guides that apply to every app.
 
