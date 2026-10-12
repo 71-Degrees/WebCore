@@ -69,55 +69,95 @@ internal static partial class DeployTool
 
     private static bool RunChecks(string root, bool includeWebBuild)
     {
+        var timings = new CheckTimings();
+        try
+        {
+            return RunStages(root, includeWebBuild, timings);
+        }
+        finally
+        {
+            timings.Print(Console.Out);
+            timings.Append(root);
+        }
+    }
+
+    private static bool RunStages(string root, bool includeWebBuild, CheckTimings timings)
+    {
         var clock = Stopwatch.StartNew();
-        // Two test projects: the unit tests (Core, guards, contracts) and the web integration tests (the real app in memory: read budgets, cache headers).
+        // The unit tests (Core, guards, contracts) and the web integration tests (the real app in memory: read budgets, cache headers), each timed on its own.
         foreach (var project in Config.TestProjects(root))
         {
-            Console.WriteLine($"Running {Path.GetFileName(project)}...");
-            // The results (a TRX file and the coverage) go where the code-quality report reads them (reports/test-results/<project>), so its test counts and coverage are never more than a push old.
-            // The folder is regenerated output, replaced each run: the coverage file lands in a new folder every time, and the old ones would pile up and be read as one.
-            var results = Path.Combine(root, "reports", "test-results", Path.GetFileName(project));
-            if (Directory.Exists(results))
+            var name = Path.GetFileName(project);
+            if (!timings.Measure("tests: " + name, () => RunTestProject(root, project)))
             {
-                Directory.Delete(results, recursive: true);
-            }
-
-            var (code, output) = Run("dotnet", $"test {project} --nologo -v q --collect:\"XPlat Code Coverage\" --logger \"trx;LogFileName=results.trx\" --results-directory \"{results}\"", root);
-            var summary = output.Split('\n').LastOrDefault(l => l.Contains("Passed!") || l.Contains("Failed!"))?.Trim();
-            if (code != 0)
-            {
-                Console.Error.WriteLine(string.Join('\n', output.Split('\n').Where(l => l.Contains("[FAIL]") || l.Contains("error") || l.Contains("Failed!") || l.Contains("budget") || l.Contains("Reads a") || l.Contains("without")).Take(30)));
-                Console.Error.WriteLine("The tests failed - nothing was pushed or built.");
                 return false;
             }
-
-            Console.WriteLine("  " + (summary ?? "passed"));
         }
+
         if (includeWebBuild)
         {
             // The web app and the voice worker (its own project, built into its own image): a change to shared code can break one and not the other.
             foreach (var project in Config.CompileProjects)
             {
-                var name = Path.GetFileName(project);
-                Console.WriteLine($"Compiling {name}...");
-                var scratch = Path.Combine(Path.GetTempPath(), Config.App + "-check-build-" + name);
-                var (buildCode, buildOutput) = Run("dotnet", $"build {project} --nologo -v q -o \"{scratch}\"", root);
-                if (buildCode != 0)
+                if (!timings.Measure("compile: " + Path.GetFileName(project), () => CompileProject(root, project)))
                 {
-                    Console.Error.WriteLine(string.Join('\n', buildOutput.Split('\n').Where(l => l.Contains(" error ")).Distinct().Take(15)));
-                    Console.Error.WriteLine($"The {name} does not compile - nothing was pushed.");
                     return false;
                 }
             }
         }
 
-        if (!QualityChecks.Scripts(root) || (includeWebBuild && !QualityChecks.Smells(root)))
+        if (!timings.Measure("scripts: type check and lint", () => QualityChecks.Scripts(root)))
+        {
+            return false;
+        }
+
+        if (includeWebBuild && !timings.Measure("code smells", () => QualityChecks.Smells(root)))
         {
             return false;
         }
 
         Console.WriteLine($"All checks passed in {clock.Elapsed.TotalSeconds:N0}s.");
         return true;
+    }
+
+    private static bool RunTestProject(string root, string project)
+    {
+        Console.WriteLine($"Running {Path.GetFileName(project)}...");
+        // The results (a TRX file and the coverage) go where the code-quality report reads them (reports/test-results/<project>), so its test counts and coverage are never more than a push old.
+        // The folder is regenerated output, replaced each run: the coverage file lands in a new folder every time, and the old ones would pile up and be read as one.
+        var results = Path.Combine(root, "reports", "test-results", Path.GetFileName(project));
+        if (Directory.Exists(results))
+        {
+            Directory.Delete(results, recursive: true);
+        }
+
+        var (code, output) = Run("dotnet", $"test {project} --nologo -v q --collect:\"XPlat Code Coverage\" --logger \"trx;LogFileName=results.trx\" --results-directory \"{results}\"", root);
+        var summary = output.Split('\n').LastOrDefault(l => l.Contains("Passed!") || l.Contains("Failed!"))?.Trim();
+        if (code != 0)
+        {
+            Console.Error.WriteLine(string.Join('\n', output.Split('\n').Where(l => l.Contains("[FAIL]") || l.Contains("error") || l.Contains("Failed!") || l.Contains("budget") || l.Contains("Reads a") || l.Contains("without")).Take(30)));
+            Console.Error.WriteLine("The tests failed - nothing was pushed or built.");
+            return false;
+        }
+
+        Console.WriteLine("  " + (summary ?? "passed"));
+        return true;
+    }
+
+    private static bool CompileProject(string root, string project)
+    {
+        var name = Path.GetFileName(project);
+        Console.WriteLine($"Compiling {name}...");
+        var scratch = Path.Combine(Path.GetTempPath(), Config.App + "-check-build-" + name);
+        var (buildCode, buildOutput) = Run("dotnet", $"build {project} --nologo -v q -o \"{scratch}\"", root);
+        if (buildCode == 0)
+        {
+            return true;
+        }
+
+        Console.Error.WriteLine(string.Join('\n', buildOutput.Split('\n').Where(l => l.Contains(" error ")).Distinct().Take(15)));
+        Console.Error.WriteLine($"The {name} does not compile - nothing was pushed.");
+        return false;
     }
 
     // install-hooks: writes .git/hooks/pre-push. LF line endings matter: git runs it with sh, which chokes on CRLF.
