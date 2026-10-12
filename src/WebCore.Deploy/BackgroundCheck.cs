@@ -33,6 +33,13 @@ internal static partial class BackgroundCheck
     internal static IReadOnlyList<string> SubmodulePaths(string gitmodules) =>
         SubmodulePath().Matches(gitmodules).Select(m => m.Groups[1].Value.Replace('/', Path.DirectorySeparatorChar)).ToList();
 
+    /// <summary>The arguments that start the run again. Started with <c>dotnet &lt;dll&gt;</c> the host is dotnet and the tool's dll is its first argument; started through <c>dotnet run</c> the host is the tool's own executable, which takes the command directly.</summary>
+    internal static string LaunchArguments(string? processPath, string entryAssembly, string commit)
+    {
+        var viaDotnet = string.Equals(Path.GetFileNameWithoutExtension(processPath), "dotnet", StringComparison.OrdinalIgnoreCase);
+        return (viaDotnet ? $"\"{entryAssembly}\" " : string.Empty) + $"background-check --commit {commit}";
+    }
+
     /// <summary>Starts a background run for the current commit and returns at once: a separate, hidden process that outlives the push (and the git hook that started it).</summary>
     public static void Start(string root)
     {
@@ -49,7 +56,7 @@ internal static partial class BackgroundCheck
             return;
         }
 
-        Launch(root, $"\"{entry}\" background-check --commit {commit}");
+        Launch(root, LaunchArguments(Environment.ProcessPath, entry, commit));
         Console.WriteLine($"Background checks started for {commit[..Math.Min(8, commit.Length)]} (reports/background/status.json says how they go; the report opens when they finish).");
     }
 

@@ -44,6 +44,14 @@ public sealed class BackgroundCheckTests : IDisposable
     }
 
     [Fact]
+    public void TheRunIsRestartedTheWayTheToolWasStarted()
+    {
+        // dotnet <dll>: the dll is the host's first argument. dotnet run: the host is the tool's own executable and takes the command directly.
+        Assert.Equal("\"C:\\t\\Deploy.dll\" background-check --commit abc", BackgroundCheck.LaunchArguments(@"C:\Program Files\dotnet\dotnet.exe", @"C:\t\Deploy.dll", "abc"));
+        Assert.Equal("background-check --commit abc", BackgroundCheck.LaunchArguments(@"C:\t\Deploy.exe", @"C:\t\Deploy.dll", "abc"));
+    }
+
+    [Fact]
     public void NoGitmodulesMeansNoSubmodules()
     {
         Assert.Empty(BackgroundCheck.SubmodulePaths(string.Empty));
