@@ -74,7 +74,15 @@ internal static partial class DeployTool
         foreach (var project in Config.TestProjects(root))
         {
             Console.WriteLine($"Running {Path.GetFileName(project)}...");
-            var (code, output) = Run("dotnet", $"test {project} --nologo -v q", root);
+            // The results (a TRX file and the coverage) go where the code-quality report reads them (reports/test-results/<project>), so its test counts and coverage are never more than a push old.
+            // The folder is regenerated output, replaced each run: the coverage file lands in a new folder every time, and the old ones would pile up and be read as one.
+            var results = Path.Combine(root, "reports", "test-results", Path.GetFileName(project));
+            if (Directory.Exists(results))
+            {
+                Directory.Delete(results, recursive: true);
+            }
+
+            var (code, output) = Run("dotnet", $"test {project} --nologo -v q --collect:\"XPlat Code Coverage\" --logger \"trx;LogFileName=results.trx\" --results-directory \"{results}\"", root);
             var summary = output.Split('\n').LastOrDefault(l => l.Contains("Passed!") || l.Contains("Failed!"))?.Trim();
             if (code != 0)
             {
