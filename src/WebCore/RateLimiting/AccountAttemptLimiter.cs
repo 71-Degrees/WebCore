@@ -20,9 +20,21 @@ namespace WebCore.RateLimiting;
 /// </summary>
 public sealed class AccountAttemptLimiter
 {
-    private readonly SlidingWindowRateLimiter _global = new(maxInWindow: 20, window: TimeSpan.FromMinutes(10));
-    private readonly KeyedRateLimiter _perAddress = new(maxInWindow: 10, window: TimeSpan.FromMinutes(10));
-    private readonly KeyedRateLimiter _perAccount = new(maxInWindow: 10, window: TimeSpan.FromMinutes(15));
+    private readonly SlidingWindowRateLimiter _global;
+    private readonly KeyedRateLimiter _perAddress;
+    private readonly KeyedRateLimiter _perAccount;
+
+    /// <summary>
+    /// <paramref name="scale"/> multiplies every ceiling (1, the default, is what runs in production). A development or test site raises it so that a whole suite of browser tests, which all come from one address, is not
+    /// held back by the limits that protect a real site.
+    /// </summary>
+    public AccountAttemptLimiter(int scale = 1)
+    {
+        var factor = Math.Max(1, scale);
+        _global = new SlidingWindowRateLimiter(maxInWindow: 20 * factor, window: TimeSpan.FromMinutes(10));
+        _perAddress = new KeyedRateLimiter(maxInWindow: 10 * factor, window: TimeSpan.FromMinutes(10));
+        _perAccount = new KeyedRateLimiter(maxInWindow: 10 * factor, window: TimeSpan.FromMinutes(15));
+    }
 
     /// <summary>A registration attempt: allowed when this address has attempts left and the shared ceiling has room.</summary>
     public bool TryAcquire(string? address) => TryAcquireAddress(address) && _global.TryAcquire();

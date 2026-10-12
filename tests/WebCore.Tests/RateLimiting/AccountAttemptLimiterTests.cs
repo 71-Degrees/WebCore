@@ -81,4 +81,17 @@ public class AccountAttemptLimiterTests
             Assert.True(limiter.TryAcquireAddress(null));
         }
     }
+
+    [Fact]
+    public void A_scale_multiplies_every_ceiling_and_nothing_below_one_lowers_them()
+    {
+        var scaled = new AccountAttemptLimiter(scale: 3);
+        var addressAllowed = Enumerable.Range(0, 40).Count(_ => scaled.TryAcquireAddress("203.0.113.5"));
+
+        var floor = new AccountAttemptLimiter(scale: 0);
+        var floorAllowed = Enumerable.Range(0, 40).Count(_ => floor.TryAcquireAddress("203.0.113.5"));
+
+        Assert.Equal(30, addressAllowed);   // 10 per address, three times over
+        Assert.Equal(10, floorAllowed);     // a scale under one is treated as one
+    }
 }
