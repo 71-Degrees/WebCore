@@ -108,6 +108,22 @@ public sealed class ConsoleActionSettings
     public string[] Targets { get; init; } = Array.Empty<string>();
 }
 
+/// <summary>The slow checks that run after a push instead of during it, on a separate copy of the code (see BackgroundCheck).</summary>
+public sealed class BackgroundSettings
+{
+    /// <summary>Commands to run in the copy, in order, through cmd. Placeholders: {main} (the real working folder), {reports} (its reports folder), {commit}.</summary>
+    public string[] Commands { get; init; } = Array.Empty<string>();
+
+    /// <summary>A command run last, whatever the others did: it builds the report and shows it.</summary>
+    public string? Report { get; init; }
+
+    /// <summary>Environment variables for the commands (the same placeholders apply): for example where their outputs go.</summary>
+    public Dictionary<string, string> Env { get; init; } = new();
+
+    /// <summary>Folders linked from the working folder into the copy rather than copied (node_modules).</summary>
+    public string[] Link { get; init; } = Array.Empty<string>();
+}
+
 /// <summary>
 /// Everything that differs from one app to the next, read from <c>deploy/deploy.json</c> in the repository being deployed. Only <c>app</c>, <c>webProject</c> and <c>targets</c> are needed;
 /// the rest default to what a standard 71 Degrees web app does.
@@ -152,6 +168,9 @@ public sealed class DeployConfig
 
     /// <summary>Quiets the "site is down" alert during deploys and setting changes. Off when absent.</summary>
     public AlertQuietSettings? AlertQuiet { get; init; }
+
+    /// <summary>Checks run after a push, away from the push (coverage, browser tests, the report). Off when absent.</summary>
+    public BackgroundSettings? Background { get; init; }
 
     /// <summary>Extra console buttons, after the standard ones.</summary>
     public ConsoleActionSettings[] ConsoleActions { get; init; } = Array.Empty<ConsoleActionSettings>();

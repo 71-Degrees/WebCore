@@ -100,6 +100,7 @@ internal static partial class DeployTool
         ["minify"] = o => Task.FromResult(MinifyCommand(o)),
         ["check"] = o => Task.FromResult(Check(o) ? 0 : 1),
         ["install-hooks"] = _ => Task.FromResult(InstallHooks()),
+        ["background-check"] = BackgroundCheck.RunAsync,
         ["setting"] = SettingCommand.RunAsync,
         ["console"] = ConsoleCommand.RunAsync,
         ["backfill-tags"] = o => Task.FromResult(BackfillTags(o)),
