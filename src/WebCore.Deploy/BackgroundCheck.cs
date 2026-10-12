@@ -49,14 +49,30 @@ internal static partial class BackgroundCheck
             return;
         }
 
-        // Shell-executed and hidden, so it holds none of the hook's output handles: git would otherwise wait for the push's last pipe to close, which is the run's last line.
-        Process.Start(new ProcessStartInfo(Environment.ProcessPath, $"\"{entry}\" background-check --commit {commit}")
-        {
-            WorkingDirectory = root,
-            UseShellExecute = true,
-            WindowStyle = ProcessWindowStyle.Hidden,
-        });
+        Launch(root, $"\"{entry}\" background-check --commit {commit}");
         Console.WriteLine($"Background checks started for {commit[..Math.Min(8, commit.Length)]} (reports/background/status.json says how they go; the report opens when they finish).");
+    }
+
+    /// <summary>
+    /// Starts the run in a new, hidden process that belongs to nobody: PowerShell's Start-Process gives it its own console, so it holds none of the hook's output handles (git would wait for them to close, which is the
+    /// run's last line) and does not end with the hook. Git's own variables (GIT_DIR and the rest, set while a hook runs) are removed first: inherited, they would point every git command the run makes at this repository
+    /// instead of the copy it works in.
+    /// </summary>
+    private static void Launch(string root, string dotnetArguments)
+    {
+        var quote = (string text) => text.Replace("'", "''", StringComparison.Ordinal);
+        var command = $"Start-Process -WindowStyle Hidden -WorkingDirectory '{quote(root)}' -FilePath '{quote(Environment.ProcessPath!)}' -ArgumentList '{quote(dotnetArguments)}'";
+        var info = new ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = root };
+        info.ArgumentList.Add("-NoProfile");
+        info.ArgumentList.Add("-Command");
+        info.ArgumentList.Add(command);
+        foreach (var key in info.Environment.Keys.Where(k => k.StartsWith("GIT_", StringComparison.OrdinalIgnoreCase)).ToList())
+        {
+            info.Environment.Remove(key);
+        }
+
+        using var launcher = Process.Start(info);
+        launcher?.WaitForExit(15000);
     }
 
     /// <summary>background-check [--commit &lt;sha&gt;]: the run itself.</summary>
