@@ -51,9 +51,19 @@ public interface IVerifyCheck
     Task<IReadOnlyList<VerifyOutcome>> RunAsync(VerifyContext context);
 }
 
+/// <summary>Told the whole verify result once it is in (every standard and app check), for something that reports it onward: the health dashboard, a chat message. It must not change the result.</summary>
+public interface IVerifyObserver
+{
+    /// <param name="afterDeploy">True when this verify ended a stage or prod deploy (a release just happened) rather than being run by hand.</param>
+    Task ObserveAsync(VerifyContext context, IReadOnlyList<VerifyOutcome> outcomes, bool afterDeploy);
+}
+
 /// <summary>What an app adds to the standard deploy tool from its own launcher project.</summary>
 public sealed class DeployExtensions
 {
     /// <summary>Checks run after the configured page checks, as part of every verify.</summary>
     public IReadOnlyList<IVerifyCheck> VerifyChecks { get; init; } = Array.Empty<IVerifyCheck>();
+
+    /// <summary>Told the finished verify result, after the checks and before the report is printed.</summary>
+    public IReadOnlyList<IVerifyObserver> VerifyObservers { get; init; } = Array.Empty<IVerifyObserver>();
 }

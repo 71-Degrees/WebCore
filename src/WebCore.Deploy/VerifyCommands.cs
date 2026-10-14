@@ -39,7 +39,24 @@ internal static class VerifyCommands
 
         outcomes.AddRange(await GenericChecks.RunSiteChecksAsync(context, settings, home));
         outcomes.Add(CheckLoggedErrors(name, target, options));
+        await NotifyObserversAsync(options.Extensions.VerifyObservers, context, outcomes, afterDeploy).ConfigureAwait(false);
         return Report(name, outcomes);
+    }
+
+    /// <summary>Tells each observer the result. One that fails is noted and skipped: reporting the verify onward must never turn a good deploy into a failed one.</summary>
+    internal static async Task NotifyObserversAsync(IEnumerable<IVerifyObserver> observers, VerifyContext context, IReadOnlyList<VerifyOutcome> outcomes, bool afterDeploy)
+    {
+        foreach (var observer in observers)
+        {
+            try
+            {
+                await observer.ObserveAsync(context, outcomes, afterDeploy).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException or InvalidOperationException)
+            {
+                Console.WriteLine($"  NOTE  {observer.GetType().Name} could not report the result onward: {ex.Message}");
+            }
+        }
     }
 
     private static async Task<VerifyOutcome> CheckVersionAsync(VerifyContext context, string? expected)
