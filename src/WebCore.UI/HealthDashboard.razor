@@ -142,25 +142,28 @@
         History.TryGetValue(signal.Id, out var points) ? Sparkline.Svg(points.Where(p => p.Value is not null).Select(p => p.Value!.Value).TakeLast(40).ToList(), 220, 36) : string.Empty;
 
     // Mobile first: one column, a sticky banner, big tap targets with the detail folded away. From 900px: columns of cards with every card open, as a wide screen has room to read.
+    // Colours come from the host app's own tokens (--tn-* here) with dark fallbacks, and every surface is opaque: it must read on whatever the app's page looks like, never on the browser's default white.
     private const string Styles = """
-        .wc-health { --ok:#3fb97a; --warn:#e7a935; --bad:#e5534b; --none:#8a93b0; --card:rgba(127,138,170,.12); --line:rgba(127,138,170,.28); color: inherit; max-width: 1280px; margin: 0 auto; font: inherit; }
-        .wc-banner { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; justify-content: space-between; padding: .75rem 1rem; border-radius: 0 0 14px 14px; border: 1px solid var(--line); border-top: 0; backdrop-filter: blur(8px); background: color-mix(in srgb, var(--accent, var(--none)) 22%, canvas); }
+        .wc-health { --wc-bg: var(--tn-bg, #0a0c1c); --wc-surface: var(--tn-panel, #161a33); --wc-text: var(--tn-text, #f1f2ff); --wc-muted: var(--tn-muted, #9aa0c9); --wc-line: var(--tn-border, rgba(157,168,255,.22)); --wc-link: #b6a8ff;
+          --ok: var(--tn-good, #34d399); --warn: var(--tn-gold, #f2b84b); --bad: var(--tn-bad, #f4515f); --none: var(--tn-muted, #9aa0c9);
+          color: var(--wc-text); max-width: 1280px; margin: 0 auto; font: inherit; }
+        .wc-banner { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; justify-content: space-between; padding: .75rem 1rem; border-radius: 0 0 14px 14px; border: 1px solid var(--wc-line); border-top: 0; background: color-mix(in srgb, var(--accent, var(--none)) 16%, var(--wc-bg)); color: var(--wc-text); }
         .wc-banner.wc-green { --accent: var(--ok); } .wc-banner.wc-amber { --accent: var(--warn); } .wc-banner.wc-red { --accent: var(--bad); }
-        .wc-title { margin: 0; font-size: 1.25rem; } .wc-env { text-transform: uppercase; letter-spacing: .08em; font-size: .72rem; opacity: .75; }
-        .wc-verdict { font-weight: 600; color: var(--accent, inherit); }
-        .wc-banner-meta { display: flex; gap: .75rem; font-size: .85rem; opacity: .85; } .wc-notice { flex-basis: 100%; font-size: .85rem; opacity: .85; }
-        .wc-empty { padding: 1rem; opacity: .75; }
-        .wc-areas { padding: .5rem 0 2rem; } .wc-area h2 { font-size: .95rem; text-transform: uppercase; letter-spacing: .06em; opacity: .75; margin: 1.1rem 1rem .4rem; }
+        .wc-title { margin: 0; font-size: 1.25rem; color: var(--wc-text); } .wc-env { text-transform: uppercase; letter-spacing: .08em; font-size: .72rem; color: var(--wc-muted); }
+        .wc-verdict { font-weight: 700; color: var(--accent, var(--wc-text)); }
+        .wc-banner-meta { display: flex; gap: .75rem; font-size: .85rem; color: var(--wc-muted); } .wc-notice { flex-basis: 100%; font-size: .85rem; color: var(--wc-muted); }
+        .wc-empty { padding: 1rem; color: var(--wc-muted); }
+        .wc-areas { padding: .5rem 0 2rem; } .wc-area h2 { font-size: .95rem; text-transform: uppercase; letter-spacing: .06em; color: var(--wc-muted); margin: 1.1rem 1rem .4rem; }
         .wc-cards { display: grid; gap: .6rem; padding: 0 .75rem; }
-        .wc-card { border: 1px solid var(--line); border-left: 5px solid var(--accent, var(--none)); border-radius: 12px; background: var(--card); }
+        .wc-card { border: 1px solid var(--wc-line); border-left: 5px solid var(--accent, var(--none)); border-radius: 12px; background: var(--wc-surface); color: var(--wc-text); }
         .wc-card.wc-green { --accent: var(--ok); } .wc-card.wc-amber { --accent: var(--warn); } .wc-card.wc-red { --accent: var(--bad); } .wc-card.wc-unknown { --accent: var(--none); }
-        .wc-head { all: unset; box-sizing: border-box; display: grid; grid-template-columns: auto 1fr auto; gap: .15rem .6rem; align-items: center; width: 100%; min-height: 56px; padding: .6rem .8rem; cursor: pointer; }
+        .wc-head { all: unset; box-sizing: border-box; display: grid; grid-template-columns: auto 1fr auto; gap: .15rem .6rem; align-items: center; width: 100%; min-height: 56px; padding: .6rem .8rem; cursor: pointer; color: var(--wc-text); }
         .wc-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 10px; }
-        .wc-dot { width: .8rem; height: .8rem; border-radius: 50%; background: var(--accent, var(--none)); grid-row: 1 / span 2; }
-        .wc-card-title { font-weight: 600; } .wc-age { font-size: .78rem; opacity: .7; text-align: right; } .wc-headline { grid-column: 2 / span 2; font-size: .95rem; opacity: .9; }
-        .wc-body { display: none; padding: 0 .9rem .8rem 2.1rem; font-size: .9rem; } .wc-card.open .wc-body { display: block; }
-        .wc-body p { margin: .3rem 0; } .wc-stale { color: var(--warn); } .wc-trend { display: flex; align-items: center; gap: .6rem; margin: .4rem 0; color: var(--accent); } .wc-trend-note { font-size: .78rem; opacity: .7; color: inherit; }
-        .wc-links { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin-top: .4rem; } .wc-links a { padding: .35rem 0; }
+        .wc-dot { width: .8rem; height: .8rem; border-radius: 50%; background: var(--accent, var(--none)); grid-column: 1; grid-row: 1 / span 2; }
+        .wc-card-title { grid-column: 2; grid-row: 1; font-weight: 700; color: var(--wc-text); } .wc-age { grid-column: 3; grid-row: 1; font-size: .78rem; color: var(--wc-muted); text-align: right; } .wc-headline { grid-column: 2 / span 2; grid-row: 2; font-size: .95rem; color: var(--wc-text); }
+        .wc-body { display: none; padding: 0 .9rem .8rem 2.1rem; font-size: .9rem; color: var(--wc-muted); } .wc-card.open .wc-body { display: block; }
+        .wc-body p { margin: .3rem 0; } .wc-stale { color: var(--warn); } .wc-trend { display: flex; align-items: center; gap: .6rem; margin: .4rem 0; color: var(--accent); } .wc-trend-note { font-size: .78rem; color: var(--wc-muted); }
+        .wc-links { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin-top: .4rem; } .wc-links a { padding: .35rem 0; color: var(--wc-link); }
         @media (min-width: 900px) {
           .wc-banner { border-radius: 0 0 16px 16px; padding: 1rem 1.5rem; } .wc-title { font-size: 1.6rem; }
           .wc-areas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 1.5rem; padding: 1rem 1.5rem 3rem; align-items: start; }
