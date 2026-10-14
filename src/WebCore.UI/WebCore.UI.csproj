@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <!-- Shared Blazor components every 71 Degrees app can use: today the health dashboard (signals as cards, laid out for a phone or a wide screen). Presentational only: the app passes in what to show,
+       so nothing here knows an app's data. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>WebCore.UI</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\WebCore\WebCore.csproj" />
+  </ItemGroup>
+</Project>

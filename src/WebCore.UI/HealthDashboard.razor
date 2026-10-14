@@ -1,0 +1,172 @@
+@*
+    ---------------------------------------------------------------------------
+    Copyright © 2026 71 Degrees. All rights reserved.
+    ---------------------------------------------------------------------------
+*@
+@using WebCore.Health
+
+<style>@((MarkupString)Styles)</style>
+
+<div class="wc-health" data-testid="health-dashboard">
+    <header class="wc-banner @StatusClass(_rollup.Overall)">
+        <div class="wc-banner-main">
+            <span class="wc-env">@EnvironmentName</span>
+            <h1 class="wc-title">@Title</h1>
+            <div class="wc-verdict" data-testid="health-verdict">@Verdict</div>
+        </div>
+        <div class="wc-banner-meta">
+            <span>@_rollup.Red red</span><span>@_rollup.Amber amber</span><span>@_rollup.Green green</span>
+            @if (_rollup.Stale > 0)
+            {
+                <span>@_rollup.Stale stale</span>
+            }
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Notice))
+        {
+            <div class="wc-notice">@Notice</div>
+        }
+    </header>
+
+    @if (Signals.Count == 0)
+    {
+        <p class="wc-empty">Nothing has reported for this environment yet.</p>
+    }
+
+    <div class="wc-areas">
+        @foreach (var area in Signals.GroupBy(s => s.Area))
+        {
+            <section class="wc-area">
+                <h2>@area.Key</h2>
+                <div class="wc-cards">
+                    @foreach (var signal in area)
+                    {
+                        var open = _open.Contains(signal.Id);
+                        var effective = signal.EffectiveStatus(Now);
+                        <article class="wc-card @StatusClass(effective) @(open ? "open" : "")" data-testid="@("signal-" + signal.Id)">
+                            <button type="button" class="wc-head" aria-expanded="@(open ? "true" : "false")" @onclick="@(() => Toggle(signal.Id))">
+                                <span class="wc-dot" aria-hidden="true"></span>
+                                <span class="wc-card-title">@signal.Title</span>
+                                <span class="wc-headline">@signal.Headline</span>
+                                <span class="wc-age">@(signal.IsStale(Now) ? "stale · " : "")@Age(signal.AsOf)</span>
+                            </button>
+                            <div class="wc-body">
+                                @if (!string.IsNullOrWhiteSpace(signal.Detail))
+                                {
+                                    <p>@signal.Detail</p>
+                                }
+                                @if (signal.IsStale(Now))
+                                {
+                                    <p class="wc-stale">This was expected about every @Hours(signal.ExpectedEveryHours) and has gone quiet. The result above is its last one.</p>
+                                }
+                                @if (Trend(signal) is { Length: > 0 } svg)
+                                {
+                                    <div class="wc-trend">@((MarkupString)svg)<span class="wc-trend-note">last @(History.GetValueOrDefault(signal.Id)?.Count ?? 0) readings@(signal.Unit is null ? "" : " (" + signal.Unit + ")")</span></div>
+                                }
+                                <div class="wc-links">
+                                    @if (signal.Link is not null)
+                                    {
+                                        <a href="@signal.Link.TrimStart('/')">Open the page</a>
+                                    }
+                                    @if (signal.ReportId is not null && ReportUrl?.Invoke(signal) is { } report)
+                                    {
+                                        <a href="@report">Open the full report</a>
+                                    }
+                                </div>
+                            </div>
+                        </article>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+</div>
+
+@code {
+    private readonly HashSet<string> _open = new(StringComparer.Ordinal);
+    private HealthRollup _rollup = new(HealthStatus.Unknown, 0, 0, 0, 0, 0);
+
+    /// <summary>The environment these signals are for ("production"); shown in the banner so a staging page is never mistaken for production.</summary>
+    [Parameter]
+    public string EnvironmentName { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Title { get; set; } = "Health";
+
+    [Parameter]
+    public IReadOnlyList<HealthSignal> Signals { get; set; } = [];
+
+    [Parameter]
+    public IReadOnlyDictionary<string, List<HealthPoint>> History { get; set; } = new Dictionary<string, List<HealthPoint>>();
+
+    /// <summary>The moment the page is read at; passed in so what counts as stale is the same everywhere on the page.</summary>
+    [Parameter]
+    public DateTimeOffset Now { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>A line under the banner for something the viewer should know ("Alerts go to no one: no phone push is set up").</summary>
+    [Parameter]
+    public string? Notice { get; set; }
+
+    /// <summary>Where a signal's hosted report is opened from (the app decides the address and the admin check).</summary>
+    [Parameter]
+    public Func<HealthSignal, string?>? ReportUrl { get; set; }
+
+    protected override void OnParametersSet() => _rollup = HealthRollup.Of(Signals, Now);
+
+    private string Verdict => _rollup.Overall switch
+    {
+        HealthStatus.Red => "Action needed",
+        HealthStatus.Amber => "Needs a look",
+        HealthStatus.Green => "All clear",
+        _ => "Nothing reported yet",
+    };
+
+    private void Toggle(string id)
+    {
+        if (!_open.Remove(id))
+        {
+            _open.Add(id);
+        }
+    }
+
+    private static string StatusClass(HealthStatus status) => "wc-" + status.ToString().ToLowerInvariant();
+
+    private string Age(DateTimeOffset asOf)
+    {
+        var age = Now - asOf;
+        return age.TotalMinutes < 1 ? "just now" : age.TotalHours < 1 ? $"{(int)age.TotalMinutes} min ago" : age.TotalDays < 2 ? $"{(int)age.TotalHours} h ago" : $"{(int)age.TotalDays} days ago";
+    }
+
+    private static string Hours(double? hours) => hours is null ? "so" : hours % 24 == 0 ? (hours == 24 ? "day" : $"{hours / 24:0} days") : $"{hours:0.#} h";
+
+    private string Trend(HealthSignal signal) =>
+        History.TryGetValue(signal.Id, out var points) ? Sparkline.Svg(points.Where(p => p.Value is not null).Select(p => p.Value!.Value).TakeLast(40).ToList(), 220, 36) : string.Empty;
+
+    // Mobile first: one column, a sticky banner, big tap targets with the detail folded away. From 900px: columns of cards with every card open, as a wide screen has room to read.
+    private const string Styles = """
+        .wc-health { --ok:#3fb97a; --warn:#e7a935; --bad:#e5534b; --none:#8a93b0; --card:rgba(127,138,170,.12); --line:rgba(127,138,170,.28); color: inherit; max-width: 1280px; margin: 0 auto; font: inherit; }
+        .wc-banner { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; justify-content: space-between; padding: .75rem 1rem; border-radius: 0 0 14px 14px; border: 1px solid var(--line); border-top: 0; backdrop-filter: blur(8px); background: color-mix(in srgb, var(--accent, var(--none)) 22%, canvas); }
+        .wc-banner.wc-green { --accent: var(--ok); } .wc-banner.wc-amber { --accent: var(--warn); } .wc-banner.wc-red { --accent: var(--bad); }
+        .wc-title { margin: 0; font-size: 1.25rem; } .wc-env { text-transform: uppercase; letter-spacing: .08em; font-size: .72rem; opacity: .75; }
+        .wc-verdict { font-weight: 600; color: var(--accent, inherit); }
+        .wc-banner-meta { display: flex; gap: .75rem; font-size: .85rem; opacity: .85; } .wc-notice { flex-basis: 100%; font-size: .85rem; opacity: .85; }
+        .wc-empty { padding: 1rem; opacity: .75; }
+        .wc-areas { padding: .5rem 0 2rem; } .wc-area h2 { font-size: .95rem; text-transform: uppercase; letter-spacing: .06em; opacity: .75; margin: 1.1rem 1rem .4rem; }
+        .wc-cards { display: grid; gap: .6rem; padding: 0 .75rem; }
+        .wc-card { border: 1px solid var(--line); border-left: 5px solid var(--accent, var(--none)); border-radius: 12px; background: var(--card); }
+        .wc-card.wc-green { --accent: var(--ok); } .wc-card.wc-amber { --accent: var(--warn); } .wc-card.wc-red { --accent: var(--bad); } .wc-card.wc-unknown { --accent: var(--none); }
+        .wc-head { all: unset; box-sizing: border-box; display: grid; grid-template-columns: auto 1fr auto; gap: .15rem .6rem; align-items: center; width: 100%; min-height: 56px; padding: .6rem .8rem; cursor: pointer; }
+        .wc-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 10px; }
+        .wc-dot { width: .8rem; height: .8rem; border-radius: 50%; background: var(--accent, var(--none)); grid-row: 1 / span 2; }
+        .wc-card-title { font-weight: 600; } .wc-age { font-size: .78rem; opacity: .7; text-align: right; } .wc-headline { grid-column: 2 / span 2; font-size: .95rem; opacity: .9; }
+        .wc-body { display: none; padding: 0 .9rem .8rem 2.1rem; font-size: .9rem; } .wc-card.open .wc-body { display: block; }
+        .wc-body p { margin: .3rem 0; } .wc-stale { color: var(--warn); } .wc-trend { display: flex; align-items: center; gap: .6rem; margin: .4rem 0; color: var(--accent); } .wc-trend-note { font-size: .78rem; opacity: .7; color: inherit; }
+        .wc-links { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin-top: .4rem; } .wc-links a { padding: .35rem 0; }
+        @media (min-width: 900px) {
+          .wc-banner { border-radius: 0 0 16px 16px; padding: 1rem 1.5rem; } .wc-title { font-size: 1.6rem; }
+          .wc-areas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 1.5rem; padding: 1rem 1.5rem 3rem; align-items: start; }
+          .wc-area h2 { margin-left: 0; } .wc-cards { padding: 0; }
+          .wc-head { cursor: default; min-height: 0; } .wc-body { display: block; }
+        }
+        @media (min-width: 1280px) { .wc-areas { grid-template-columns: repeat(3, 1fr); } }
+        """;
+}
