@@ -20,9 +20,9 @@ internal static class GateSkip
 {
     private const string StateFile = "reports/gate-green.json";
 
-    /// <summary>True for the paths that cannot change what the gate finds.</summary>
+    /// <summary>True for the paths that cannot change what the gate finds: documentation, and the quality timeline, which the smell stage writes but never reads.</summary>
     internal static bool IsDocumentation(string path) =>
-        path.EndsWith(".md", StringComparison.OrdinalIgnoreCase) || path.StartsWith("docs/", StringComparison.Ordinal);
+        path.EndsWith(".md", StringComparison.OrdinalIgnoreCase) || path.StartsWith("docs/", StringComparison.Ordinal) || path == "quality/history.json";
 
     /// <summary>The fingerprint of a `git ls-tree -r` listing (`mode type sha TAB path`): a hash of every entry that is not documentation. A submodule is an entry too, so moving its pointer changes it.</summary>
     internal static string Fingerprint(IEnumerable<string> listing)

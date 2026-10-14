@@ -24,6 +24,8 @@ public class GateSkipTests
     [InlineData("README.md", true)]
     [InlineData("docs/performance.md", true)]
     [InlineData("docs/machines.json", true)]
+    [InlineData("quality/history.json", true)]
+    [InlineData("quality/baseline.json", false)]
     [InlineData("src/App/Program.cs", false)]
     [InlineData("deploy/deploy.json", false)]
     [InlineData("src/App/wwwroot/docs/page.js", false)]
