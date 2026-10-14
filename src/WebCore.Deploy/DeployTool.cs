@@ -15,7 +15,7 @@
 //   deploy rollback <stage|prod>
 //   deploy notice <stage|prod> --at "2026-10-03 22:00" [--duration 10] --message "..." [--notify] [--dry-run] [--test-to me@x.com]
 //   deploy notice-clear <stage|prod>
-//   deploy check [--tests-only]     # the tests + a compile of the web app (what the pre-push hook runs)
+//   deploy check [--tests-only] [--force]   # the tests + a compile of the web app (what the pre-push hook runs); skipped when the code is what was already checked (docs-only change, or a retry), --force runs it anyway
 //   deploy minify --dir <published folder>   # css/js minification, as the build does (--no-minify on stage/prod skips it)
 //   deploy verify <stage|prod> [--expect <build>] [--minutes N]   # smoke test of a live site: page content, version stamps, closed pages, the app's own checks, errors since deploy (also runs after stage/prod; --no-verify skips)
 //   deploy perf <stage|prod> [--samples 8] [--strict]   # times the key pages, checks static-file caching, compares with the previous build (also runs after stage/prod)

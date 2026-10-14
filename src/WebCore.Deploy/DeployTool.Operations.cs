@@ -65,7 +65,25 @@ internal static partial class DeployTool
 
     // check: what the pre-push hook and the deploy gate run - all the unit tests, and (for the hook) a compile of the web app into a scratch folder,
     // so it works while a local dev server has the normal output files locked.
-    private static bool Check(Options options) => RunChecks(RepoRoot(), includeWebBuild: !options.Flag("--tests-only"), startBackground: options.Flag("--background"));
+    // `check` (what the pre-push hook runs) skips itself when the code it would check is the code already checked (GateSkip); --force runs it anyway. --tests-only is a partial run and is never remembered as green.
+    private static bool Check(Options options)
+    {
+        var root = RepoRoot();
+        if (!options.Flag("--force") && GateSkip.Reason(root) is { } reason)
+        {
+            Console.WriteLine($"Gate skipped: {reason}. (`check --force` runs it anyway.)");
+            return true;
+        }
+
+        var wholeGate = !options.Flag("--tests-only");
+        var passed = RunChecks(root, includeWebBuild: wholeGate, startBackground: options.Flag("--background"));
+        if (passed && wholeGate)
+        {
+            GateSkip.RecordGreen(root);
+        }
+
+        return passed;
+    }
 
     private static bool RunChecks(string root, bool includeWebBuild, bool startBackground = false)
     {
