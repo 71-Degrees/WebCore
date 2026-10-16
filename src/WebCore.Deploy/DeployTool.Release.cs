@@ -134,15 +134,71 @@ internal static partial class DeployTool
     // Opt-in (--offline-page) because the gain is modest and uneven. Measured on staging: a plain zip deploy gave visitors ~4 raw 503s/hangs over
     // ~18s; with the page, one run showed the friendly page for ~10s then one slow request, another only ~1s of it before the same restart blip.
     // The restart after the files land is what still shows raw errors, and only a slot swap removes that.
-    private static string WithOfflinePage(string zip)
+    private static string WithOfflinePage(string zip, (string Name, Target Target, Options Options) t)
     {
         var copy = Path.Combine(StateDir(), "deploying.zip");
         File.Copy(zip, copy, overwrite: true);
         using var archive = ZipFile.Open(copy, ZipArchiveMode.Update);
-        using var page = typeof(DeployTool).Assembly.GetManifestResourceStream("app_offline.htm") ?? throw new InvalidOperationException("The 'being updated' page is missing from the deploy tool.");
+        var written = PageFromNoticeAsync(archive, t).GetAwaiter().GetResult();
         using var entry = archive.CreateEntry("app_offline.htm").Open();
+        if (written is not null)
+        {
+            using var writer = new StreamWriter(entry, new System.Text.UTF8Encoding(false));
+            writer.Write(written);
+            return copy;
+        }
+
+        using var page = typeof(DeployTool).Assembly.GetManifestResourceStream("app_offline.htm") ?? throw new InvalidOperationException("The 'being updated' page is missing from the deploy tool.");
         page.CopyTo(entry);
         return copy;
+    }
+
+    // The page is drawn from the downtime notice on the site (heading, message, picture, the release notes of the build in this zip). Anything missing - no notice, no key, a site that does not answer - falls back to the plain page.
+    private static async Task<string?> PageFromNoticeAsync(ZipArchive archive, (string Name, Target Target, Options Options) t)
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            var key = ApiKey(t);
+            using var noticeResponse = await http.SendAsync(Request(HttpMethod.Get, $"{t.Target.Url}/api/admin/maintenance", key));
+            var json = await noticeResponse.Content.ReadAsStringAsync();
+            if (!noticeResponse.IsSuccessStatusCode || json.Contains("\"notice\":null", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            using var document = System.Text.Json.JsonDocument.Parse(json);
+            var image = document.RootElement.TryGetProperty("notice", out var notice) && notice.TryGetProperty("imageName", out var name) && name.GetString() is { Length: > 0 } file
+                ? await ImageDataUriAsync(http, $"{t.Target.Url}/images/{Uri.EscapeDataString(file)}")
+                : null;
+            return OfflinePage.Render(OfflinePage.FromNotice(json, image, ReadReleaseNotes(archive)) ?? throw new InvalidOperationException("no notice"));
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or System.Text.Json.JsonException or TaskCanceledException)
+        {
+            Console.WriteLine($"  (the 'being updated' page is the plain one: {ex.Message})");
+            return null;
+        }
+    }
+
+    private static async Task<string?> ImageDataUriAsync(HttpClient http, string url)
+    {
+        using var response = await http.GetAsync(url);
+        var bytes = response.IsSuccessStatusCode ? await response.Content.ReadAsByteArrayAsync() : [];
+        return bytes.Length is > 0 and < 400_000 ? $"data:{response.Content.Headers.ContentType?.MediaType ?? "image/png"};base64,{Convert.ToBase64String(bytes)}" : null;
+    }
+
+    private static readonly System.Text.Json.JsonSerializerOptions NotesJson = new() { PropertyNameCaseInsensitive = true, Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } };
+
+    private static ReleaseNotes? ReadReleaseNotes(ZipArchive archive)
+    {
+        var entry = archive.GetEntry("release-notes.json");
+        if (entry is null)
+        {
+            return null;
+        }
+
+        using var stream = entry.Open();
+        return System.Text.Json.JsonSerializer.Deserialize<ReleaseNotes>(stream, NotesJson);
     }
 
     private static bool RemoveOfflinePage(Target target)
@@ -194,7 +250,7 @@ internal static partial class DeployTool
     private static int? Upload((string Name, Target Target, Options Options) t, string zip, string version)
     {
         var useOfflinePage = t.Options.Flag("--offline-page");
-        var toUpload = useOfflinePage ? WithOfflinePage(zip) : zip;
+        var toUpload = useOfflinePage ? WithOfflinePage(zip, t) : zip;
         Console.WriteLine($"Deploying {version} to {t.Target.App}{(useOfflinePage ? " (visitors see the 'being updated' page meanwhile)" : string.Empty)}...");
         var (code, output) = Run("cmd", $"/c az webapp deploy --name {t.Target.App} --resource-group {t.Target.Group} --src-path \"{toUpload}\" --type zip");
         if (useOfflinePage)
