@@ -159,4 +159,37 @@ public sealed class BackgroundCheckTests : IDisposable
             Assert.All(lines.Skip(i * 50).Take(50), l => Assert.StartsWith("stage " + i + " ", l, StringComparison.Ordinal));
         }
     }
+
+    [Fact]
+    public void TheRunWorksFromACopyOfTheTool_SoThePushThatRebuildsTheToolIsNeverBlocked()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "webcore-bg-" + Guid.NewGuid().ToString("N"));
+        var tool = Path.Combine(root, "tools", "Deploy", "bin");
+        Directory.CreateDirectory(Path.Combine(tool, "runtimes"));
+        File.WriteAllText(Path.Combine(tool, "Deploy.dll"), "dll");
+        File.WriteAllText(Path.Combine(tool, "Deploy.exe"), "exe");
+        File.WriteAllText(Path.Combine(tool, "runtimes", "native.dll"), "native");
+        try
+        {
+            var (host, assembly) = BackgroundCheck.CopyOfTool(root, Path.Combine(tool, "Deploy.exe"), Path.Combine(tool, "Deploy.dll"), "0123456789abcdef");
+
+            var copy = Path.Combine(root, "reports", "background", "tool", "01234567");
+            Assert.Equal(Path.Combine(copy, "Deploy.exe"), host);
+            Assert.Equal(Path.Combine(copy, "Deploy.dll"), assembly);
+            Assert.True(File.Exists(Path.Combine(copy, "runtimes", "native.dll")));
+
+            // a later commit takes the place of the earlier copy
+            BackgroundCheck.CopyOfTool(root, Path.Combine(tool, "Deploy.exe"), Path.Combine(tool, "Deploy.dll"), "fedcba9876543210");
+            Assert.False(Directory.Exists(copy));
+
+            // through dotnet itself, the host stays dotnet and only the dll moves
+            var (dotnetHost, dotnetAssembly) = BackgroundCheck.CopyOfTool(root, @"C:\Program Files\dotnet\dotnet.exe", Path.Combine(tool, "Deploy.dll"), "fedcba9876543210");
+            Assert.Equal(@"C:\Program Files\dotnet\dotnet.exe", dotnetHost);
+            Assert.EndsWith(Path.Combine("fedcba98", "Deploy.dll"), dotnetAssembly);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
 }

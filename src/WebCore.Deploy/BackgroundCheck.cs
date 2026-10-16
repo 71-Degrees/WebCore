@@ -40,6 +40,50 @@ internal static partial class BackgroundCheck
         return (viaDotnet ? $"\"{entryAssembly}\" " : string.Empty) + $"background-check --commit {commit}";
     }
 
+    /// <summary>
+    /// Copies the running tool (its whole output folder) to <c>reports/background/tool/&lt;commit&gt;</c> and says where the host and the tool's dll are in the copy. The host is returned as it is when it is <c>dotnet</c> itself (nothing of
+    /// the tool is locked through it). A folder from an earlier commit is removed when it can be; one still in use by a run that has not ended yet is left for the next time.
+    /// </summary>
+    internal static (string Host, string Assembly) CopyOfTool(string root, string processPath, string entryAssembly, string commit)
+    {
+        var source = Path.GetDirectoryName(entryAssembly)!;
+        var tools = Path.Combine(StateFolder(root), "tool");
+        var target = Path.Combine(tools, commit[..Math.Min(8, commit.Length)]);
+        foreach (var old in Directory.Exists(tools) ? Directory.GetDirectories(tools).Where(d => !string.Equals(d, target, StringComparison.OrdinalIgnoreCase)) : [])
+        {
+            try
+            {
+                Directory.Delete(old, recursive: true);
+            }
+            catch (IOException ex)
+            {
+                Console.WriteLine($"  (left {Path.GetFileName(old)}: a background run still uses it - {ex.Message})");
+            }
+        }
+
+        if (!Directory.Exists(target))
+        {
+            CopyFolder(source, target);
+        }
+
+        var viaDotnet = string.Equals(Path.GetFileNameWithoutExtension(processPath), "dotnet", StringComparison.OrdinalIgnoreCase);
+        return (viaDotnet ? processPath : Path.Combine(target, Path.GetFileName(processPath)), Path.Combine(target, Path.GetFileName(entryAssembly)));
+    }
+
+    private static void CopyFolder(string source, string target)
+    {
+        foreach (var directory in Directory.EnumerateDirectories(source, "*", SearchOption.AllDirectories))
+        {
+            Directory.CreateDirectory(Path.Combine(target, Path.GetRelativePath(source, directory)));
+        }
+
+        Directory.CreateDirectory(target);
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            File.Copy(file, Path.Combine(target, Path.GetRelativePath(source, file)), overwrite: true);
+        }
+    }
+
     /// <summary>Starts a background run for the current commit and returns at once: a separate, hidden process that outlives the push (and the git hook that started it).</summary>
     public static void Start(string root)
     {
@@ -56,7 +100,9 @@ internal static partial class BackgroundCheck
             return;
         }
 
-        Launch(root, LaunchArguments(Environment.ProcessPath, entry, commit));
+        // The run goes on for many minutes, so it works from a copy of the tool: started from the tool's own output folder it would hold those files, and the next push (whose hook rebuilds the tool) could not.
+        var (host, assembly) = CopyOfTool(root, Environment.ProcessPath, entry, commit);
+        Launch(root, host, LaunchArguments(host, assembly, commit));
         Console.WriteLine($"Background checks started for {commit[..Math.Min(8, commit.Length)]} (reports/background/status.json says how they go; the report opens when they finish).");
     }
 
@@ -65,10 +111,10 @@ internal static partial class BackgroundCheck
     /// run's last line) and does not end with the hook. Git's own variables (GIT_DIR and the rest, set while a hook runs) are removed first: inherited, they would point every git command the run makes at this repository
     /// instead of the copy it works in.
     /// </summary>
-    private static void Launch(string root, string dotnetArguments)
+    private static void Launch(string root, string host, string dotnetArguments)
     {
         var quote = (string text) => text.Replace("'", "''", StringComparison.Ordinal);
-        var command = $"Start-Process -WindowStyle Hidden -WorkingDirectory '{quote(root)}' -FilePath '{quote(Environment.ProcessPath!)}' -ArgumentList '{quote(dotnetArguments)}'";
+        var command = $"Start-Process -WindowStyle Hidden -WorkingDirectory '{quote(root)}' -FilePath '{quote(host)}' -ArgumentList '{quote(dotnetArguments)}'";
         var info = new ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = root };
         info.ArgumentList.Add("-NoProfile");
         info.ArgumentList.Add("-Command");
