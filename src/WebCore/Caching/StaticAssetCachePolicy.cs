@@ -25,6 +25,7 @@ public static class StaticAssetCachePolicy
         [".html"] = "about.html is served by the /about endpoint, which rewrites the host name per request",
         [".json"] = "manifests and data files: small, and they change with each deploy",
         [".txt"] = "robots.txt style files: tiny and must reflect the current environment",
+        [".ogg"] = "spoken clips (a mascot's narration): re-rendered whenever the voice is tuned, so they revalidate by ETag instead of being kept for a month",
         [".xml"] = "BingSiteAuth.xml, the Bing Webmaster Tools ownership token: a few bytes, fetched rarely, and it must keep answering as it is",
     };
 
