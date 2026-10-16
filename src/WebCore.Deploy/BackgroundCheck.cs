@@ -55,8 +55,9 @@ internal static partial class BackgroundCheck
             {
                 Directory.Delete(old, recursive: true);
             }
-            catch (IOException ex)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
+                // Windows says "access denied" (not "in use") for a folder whose program is still running.
                 Console.WriteLine($"  (left {Path.GetFileName(old)}: a background run still uses it - {ex.Message})");
             }
         }

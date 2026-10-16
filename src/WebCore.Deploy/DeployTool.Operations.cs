@@ -101,13 +101,26 @@ internal static partial class DeployTool
             timings.Append(root);
             if (passed && startBackground)
             {
-                BackgroundCheck.Start(root);
+                StartBackgroundRun(root);
             }
         }
     }
 
     // The gate: what must pass before a push. Each test project is built once (up to date, that is a couple of seconds), and then the tests, the compile of the app and the worker, the script checks and the
     // smell check all run at once, each writing to its own log. The slow, informational work (coverage, the browser tests, the full analyzer pass, the report) is a background run (BackgroundCheck).
+    // The gate has passed and the push must go through: a background run that cannot start is said, never allowed to stop the push.
+    private static void StartBackgroundRun(string root)
+    {
+        try
+        {
+            BackgroundCheck.Start(root);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  (the background checks could not be started: {ex.Message})");
+        }
+    }
+
     private static bool RunStages(string root, bool includeWebBuild, CheckTimings timings)
     {
         var projects = Config.TestProjects(root);
