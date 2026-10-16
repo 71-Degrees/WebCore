@@ -201,7 +201,7 @@ internal static partial class DeployTool
         return false;
     }
 
-    // install-hooks: writes .git/hooks/pre-push. LF line endings matter: git runs it with sh, which chokes on CRLF.
+    // install-hooks: writes the pre-push hook. LF line endings matter: git runs it with sh, which chokes on CRLF.
     private static int InstallHooks()
     {
         var hook = string.Join('\n',
@@ -218,10 +218,24 @@ internal static partial class DeployTool
             "[ $run -eq 0 ] && exit 0",
             "exec dotnet run --project tools/Deploy -- check --background",
             "");
-        var path = Path.Combine(RepoRoot(), ".git", "hooks", "pre-push");
+        var path = Path.Combine(HooksFolder(RepoRoot()), "pre-push");
         File.WriteAllText(path, hook, new System.Text.UTF8Encoding(false));
         Console.WriteLine("Installed " + path);
         return 0;
+    }
+
+    /// <summary>Where git looks for hooks: asked of git, because in a worktree <c>.git</c> is a file and the hooks live in the main repository's folder, shared by every worktree.</summary>
+    internal static string HooksFolder(string root)
+    {
+        var (code, output) = Run("git", "rev-parse --git-path hooks", root);
+        if (code != 0 || output.Trim().Length == 0)
+        {
+            throw new InvalidOperationException($"Could not find the git hooks folder of {root}: {output.Trim()}");
+        }
+
+        var folder = Path.GetFullPath(output.Trim(), root);
+        Directory.CreateDirectory(folder);
+        return folder;
     }
 
     // minify <publish folder>: shrinks app.css and js/*.js inside a published copy (what "build" does automatically) - for trying a minified site locally.
