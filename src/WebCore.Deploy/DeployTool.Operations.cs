@@ -123,7 +123,8 @@ internal static partial class DeployTool
 
     private static bool RunStages(string root, bool includeWebBuild, CheckTimings timings)
     {
-        var projects = Config.TestProjects(root);
+        // With "changedTests" set only the tests the change touches run here (that command builds what it needs); every project is built and run otherwise.
+        var projects = string.IsNullOrWhiteSpace(Config.ChangedTests) ? Config.TestProjects(root) : [];
         foreach (var project in projects)
         {
             var build = timings.Begin("build: " + Path.GetFileName(project));
@@ -138,6 +139,12 @@ internal static partial class DeployTool
         {
             var log = timings.Begin("tests: " + Path.GetFileName(project));
             stages.Add(Task.Run(() => CheckTimings.Run(log, () => RunTestProject(root, project, log))));
+        }
+
+        if (!string.IsNullOrWhiteSpace(Config.ChangedTests))
+        {
+            var changed = timings.Begin("tests: the ones for the changed files");
+            stages.Add(Task.Run(() => CheckTimings.Run(changed, () => RunChangedTests(root, Config.ChangedTests, changed))));
         }
 
         if (includeWebBuild)
@@ -162,6 +169,22 @@ internal static partial class DeployTool
         }
 
         return passed;
+    }
+
+    private static bool RunChangedTests(string root, string command, StageLog log)
+    {
+        log.WriteLine("Running the tests for the changed files...");
+        var (code, output) = Run("cmd", "/c " + command, root);
+        var lines = output.Split('\n');
+        if (code != 0)
+        {
+            log.Error(string.Join('\n', lines.Where(l => l.Contains("[FAIL]") || l.Contains("error") || l.Contains("Failed!") || l.Contains("needs a look") || l.Contains("could not run")).Take(30)));
+            log.Error("The tests for the changed files failed - nothing was pushed or built.");
+            return false;
+        }
+
+        log.WriteLine("  " + (lines.LastOrDefault(l => l.Contains("Quick check"))?.Trim() ?? "passed"));
+        return true;
     }
 
     private static bool BuildTestProject(string root, string project, StageLog log)

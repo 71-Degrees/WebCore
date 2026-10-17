@@ -143,6 +143,9 @@ public sealed class DeployConfig
     /// <summary>The test projects to run before a build. Default: every folder under tests/ that holds a project.</summary>
     public string[]? Tests { get; init; }
 
+    /// <summary>A command (run from the repository root, exit code 0 = pass) that runs just the tests the change touches, in place of every test project. When set, the pre-push check runs it instead of building and running all of <see cref="Tests"/>; the full suite is left to the background run. Default: none, every test project runs.</summary>
+    public string? ChangedTests { get; init; }
+
     /// <summary>The projects compiled by the pre-push check (the web app, a worker). Default: just the web project.</summary>
     public string[]? Compile { get; init; }
 

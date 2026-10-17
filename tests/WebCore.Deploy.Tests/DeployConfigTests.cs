@@ -34,6 +34,16 @@ public sealed class DeployConfigTests : IDisposable
         Assert.Equal(new[] { "src/Shop.Web" }, config.CompileProjects);
     }
 
+    [Fact]
+    public void TheChangedTestsCommandIsOffUnlessTheSettingsGiveOne()
+    {
+        Write("""{ "app": "Shop", "webProject": "src/Shop.Web" }""");
+        Assert.Null(DeployConfig.Load(_root).ChangedTests);
+
+        Write("""{ "app": "Shop", "webProject": "src/Shop.Web", "changedTests": "dotnet run --project tools/Quality -- quick" }""");
+        Assert.Equal("dotnet run --project tools/Quality -- quick", DeployConfig.Load(_root).ChangedTests);
+    }
+
     [Theory]
     [InlineData("""{ "webProject": "src/Web" }""")]
     [InlineData("""{ "app": "Shop" }""")]
