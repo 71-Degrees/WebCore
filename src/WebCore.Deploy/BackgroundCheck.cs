@@ -101,6 +101,9 @@ internal static partial class BackgroundCheck
             return;
         }
 
+        // Stop the run of the older push now, not when the new run gets going: the copy of the tool below removes the old copy, which a run still going holds ("left aea3fed8: access denied").
+        StopPreviousRun(root);
+
         // The run goes on for many minutes, so it works from a copy of the tool: started from the tool's own output folder it would hold those files, and the next push (whose hook rebuilds the tool) could not.
         var (host, assembly) = CopyOfTool(root, Environment.ProcessPath, entry, commit);
         Launch(root, host, LaunchArguments(host, assembly, commit));
@@ -158,6 +161,12 @@ internal static partial class BackgroundCheck
                 var code = await RunInAsync(expanded, copy, settings, root, commit, log);
                 status.Steps.Add(new BackgroundStep { Command = expanded, ExitCode = code, Seconds = Math.Round(started.Elapsed.TotalSeconds, 1) });
                 Save(root, status);
+                if (code != 0)
+                {
+                    // The push is already lost: the later stages would only cost minutes and bury the failure.
+                    await log.WriteLineAsync("\nStopped after the first failing step; the remaining steps were not run.");
+                    break;
+                }
             }
 
             status.State = status.Steps.All(s => s.ExitCode == 0) ? "passed" : "failed";
@@ -178,6 +187,13 @@ internal static partial class BackgroundCheck
     // Latest wins: a run still going for an older push is stopped, and this one's process id takes its place.
     private static void ReplacePreviousRun(string root)
     {
+        StopPreviousRun(root);
+        File.WriteAllText(Path.Combine(StateFolder(root), "running.pid"), Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>Stops the run named in running.pid (and everything it started), if it is still going and is not this process. Safe to call twice: the second time there is nothing left.</summary>
+    internal static void StopPreviousRun(string root)
+    {
         var pidFile = Path.Combine(StateFolder(root), "running.pid");
         if (File.Exists(pidFile) && int.TryParse(File.ReadAllText(pidFile).Trim(), out var pid) && pid != Environment.ProcessId)
         {
@@ -185,14 +201,13 @@ internal static partial class BackgroundCheck
             {
                 using var old = Process.GetProcessById(pid);
                 old.Kill(entireProcessTree: true);
+                old.WaitForExit(10000);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
             {
                 // It had already finished: nothing to stop.
             }
         }
-
-        File.WriteAllText(pidFile, Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
     /// <summary>The copy of the code a run works in: a worktree of the pushed commit (kept, so builds are incremental), the submodules copied from the working folder, and the folders the settings say to link.</summary>

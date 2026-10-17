@@ -161,6 +161,32 @@ public sealed class BackgroundCheckTests : IDisposable
     }
 
     [Fact]
+    public void ANewPush_StopsTheRunOfTheOlderOneBeforeItsCopyOfTheToolIsReplaced()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "webcore-bg-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "reports", "background"));
+        using var older = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ping", "-n 60 127.0.0.1") { CreateNoWindow = true, UseShellExecute = false })!;
+        try
+        {
+            File.WriteAllText(Path.Combine(root, "reports", "background", "running.pid"), older.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+            BackgroundCheck.StopPreviousRun(root);
+
+            Assert.True(older.WaitForExit(5000));
+            BackgroundCheck.StopPreviousRun(root);   // nothing left to stop is not an error
+        }
+        finally
+        {
+            if (!older.HasExited)
+            {
+                older.Kill();
+            }
+
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void TheRunWorksFromACopyOfTheTool_SoThePushThatRebuildsTheToolIsNeverBlocked()
     {
         var root = Path.Combine(Path.GetTempPath(), "webcore-bg-" + Guid.NewGuid().ToString("N"));
