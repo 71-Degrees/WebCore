@@ -21,6 +21,7 @@ public sealed class FileDocumentStore : IDocumentStore
 
     private readonly string _folder;
     private const int ReadRetries = 3;
+    private const int WriteRetries = 8;
 
     private readonly object _moveLock = new();
 
@@ -63,9 +64,22 @@ public sealed class FileDocumentStore : IDocumentStore
     public async Task SetAsync<T>(string name, T value, CancellationToken cancellationToken = default)
     {
         var (path, tempPath) = await WriteTempAsync(name, value, cancellationToken).ConfigureAwait(false);
-        lock (_moveLock)
+        for (var attempt = 0; ; attempt++)
         {
-            File.Move(tempPath, path, overwrite: true);   // on Windows two moves onto one destination at once can throw; the move itself takes microseconds, so one lock is plenty
+            try
+            {
+                lock (_moveLock)
+                {
+                    File.Move(tempPath, path, overwrite: true);   // on Windows two moves onto one destination at once can throw; the move itself takes microseconds, so one lock is plenty
+                }
+
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && attempt < WriteRetries)
+            {
+                // A reader has the document open (or a file replaced a moment ago is still being closed): Windows refuses the rename with "Access to the path is denied" for a few milliseconds, the same moment readers retry for (GetAsync).
+                await Task.Delay(10 * (attempt + 1), cancellationToken).ConfigureAwait(false);
+            }
         }
     }
 
