@@ -46,7 +46,30 @@ internal static class GateSkip
         }
 
         var last = ReadState(root);
-        return last is not null && last.Fingerprint == head ? $"this code already passed the gate on this machine at {last.At} (commit {last.Commit})" : null;
+        return last is not null && last.Fingerprint == head ? $"this code already passed the gate on this machine at {last.At} (commit {last.Commit})" : ReasonAfterRebase(root, last);
+    }
+
+    /// <summary>The paths this push changes against the branch it goes to, or null when that cannot be known (no upstream, or edits in the tree that are not in HEAD): the gate then runs every stage.</summary>
+    internal static IReadOnlyList<string>? ChangedPaths(string root) =>
+        HasUncommittedCodeChange(root) || !Upstream(root, out _) ? null : NamesChanged(root, "@{u}", "HEAD");
+
+    // A push race: the other machine pushed while the gate ran, the push was refused, and a clean rebase put the same change on top of the new tip. The gate that passed is still the answer when the change is
+    // identical (GateScope.ChangeSignature) and nothing that arrived underneath it touches the changed files, a project file or a submodule pointer.
+    private static string? ReasonAfterRebase(string root, GreenState? last)
+    {
+        if (last?.Upstream is not { Length: > 0 } before || last.Signature is null || last.Files is null || !Upstream(root, out var now) || now == before)
+        {
+            return null;
+        }
+
+        if (DeployTool.Run("git", $"merge-base --is-ancestor {before} {now}", root).Code != 0 || ChangeSignature(root) != last.Signature)
+        {
+            return null;
+        }
+
+        return GateScope.UpstreamLeavesGateValid(last.Files, NamesChanged(root, before, now))
+            ? $"the same change passed the gate at {last.At} (commit {last.Commit}); only unrelated files arrived on the branch since, so a rebase after a push race does not repeat it"
+            : null;
     }
 
     /// <summary>Remembers that the code in HEAD passed the whole gate, so pushing it again does not repeat it.</summary>
@@ -58,7 +81,8 @@ internal static class GateSkip
         }
 
         var commit = DeployTool.Run("git", "rev-parse --short=8 HEAD", root).Output.Trim();
-        var state = new GreenState(Fingerprint(Listing(root, "HEAD")), commit, DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
+        var known = Upstream(root, out var upstream);
+        var state = new GreenState(Fingerprint(Listing(root, "HEAD")), commit, DateTime.Now.ToString("yyyy-MM-dd HH:mm"), known ? upstream : null, known ? ChangeSignature(root) : null, known ? NamesChanged(root, "@{u}", "HEAD") : null);
         var path = Path.Combine(root, StateFile);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, JsonSerializer.Serialize(state));
@@ -85,5 +109,18 @@ internal static class GateSkip
         }
     }
 
-    private sealed record GreenState(string Fingerprint, string Commit, string At);
+    private static bool Upstream(string root, out string sha)
+    {
+        var (code, output) = DeployTool.Run("git", "rev-parse --verify -q @{u}", root);
+        sha = output.Trim();
+        return code == 0 && sha.Length > 0;
+    }
+
+    private static string[] NamesChanged(string root, string from, string to) =>
+        DeployTool.Run("git", $"diff --name-only {from} {to}", root).Output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private static string ChangeSignature(string root) => GateScope.ChangeSignature(DeployTool.Run("git", "diff --no-color @{u} HEAD", root).Output);
+
+    // Upstream, Signature and Files are what a rebase after a push race is recognised by; a note written before they existed lacks them and simply never matches.
+    private sealed record GreenState(string Fingerprint, string Commit, string At, string? Upstream = null, string? Signature = null, string[]? Files = null);
 }

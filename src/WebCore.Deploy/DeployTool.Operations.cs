@@ -135,6 +135,7 @@ internal static partial class DeployTool
         }
 
         var stages = new List<Task<bool>>();
+        var touched = GateSkip.ChangedPaths(root);   // null: not known, so every stage runs
         foreach (var project in projects)
         {
             var log = timings.Begin("tests: " + Path.GetFileName(project));
@@ -147,14 +148,17 @@ internal static partial class DeployTool
             stages.Add(Task.Run(() => CheckTimings.Run(changed, () => RunChangedTests(root, Config.ChangedTests, changed))));
         }
 
-        if (includeWebBuild)
+        if (includeWebBuild && GateScope.NeedsCompile(touched))
         {
             var compile = timings.Begin("compile: " + string.Join(" + ", Config.CompileProjects.Select(Path.GetFileName)));
             stages.Add(Task.Run(() => CheckTimings.Run(compile, () => Config.CompileProjects.All(p => CompileProject(root, p, compile)))));
         }
 
-        var scripts = timings.Begin("scripts: type check and lint");
-        stages.Add(Task.Run(() => CheckTimings.Run(scripts, () => QualityChecks.Scripts(root, scripts))));
+        if (GateScope.NeedsScripts(touched))
+        {
+            var scripts = timings.Begin("scripts: type check and lint");
+            stages.Add(Task.Run(() => CheckTimings.Run(scripts, () => QualityChecks.Scripts(root, scripts))));
+        }
         if (includeWebBuild)
         {
             var smells = timings.Begin("code smells");
