@@ -232,6 +232,7 @@ internal static partial class DeployTool
         if (!await WaitForBuildAsync(t.Target, version))
         {
             Console.Error.WriteLine($"The new build did not report version {version} within 5 minutes. Check {t.Target.Url}{Config.Endpoints.Version} and the Azure log stream; 'rollback {t.Name}' restores the previous build.");
+            await RestoreStagingAfterDeadBuildAsync(t, state, isRollback);
             return 5;
         }
 
@@ -245,6 +246,22 @@ internal static partial class DeployTool
         await AfterDeployAsync(t, version, isRollback);
         return 0;
     }
+
+    /// <summary>Staging only: a build that never answers leaves nobody to use the site, so the build that was running (still recorded as current, because the failed one was never saved) goes back at once. Production is never touched without a person.</summary>
+    private static async Task RestoreStagingAfterDeadBuildAsync((string Name, Target Target, Options Options) t, DeployState state, bool isRollback)
+    {
+        if (!state.Current.TryGetValue(t.Name, out var running) || !ShouldRestoreAfterDeadBuild(t.Name, isRollback, File.Exists(running.Zip)))
+        {
+            return;
+        }
+
+        Console.Error.WriteLine($"Putting staging back on {running.Version}, the build that was running before this deploy.");
+        var restored = await PushAsync(t, state, running.Zip, running.Version, isRollback: true);
+        Console.Error.WriteLine(restored == 0 ? "Staging is back on the previous build." : $"The automatic restore failed (exit {restored}); staging needs 'rollback stage' by hand.");
+    }
+
+    /// <summary>Only staging, only after a forward deploy (never after a rollback, which would loop), and only when the build to go back to is still on disk.</summary>
+    internal static bool ShouldRestoreAfterDeadBuild(string target, bool isRollback, bool previousBuildOnDisk) => !isRollback && target == "stage" && previousBuildOnDisk;
 
     /// <summary>Uploads the build to Azure. Returns null when it went up, otherwise the exit code: 4 when the upload failed, 6 when the "being updated" page could not be taken down afterwards.</summary>
     private static int? Upload((string Name, Target Target, Options Options) t, string zip, string version)
