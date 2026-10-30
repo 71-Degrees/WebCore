@@ -179,15 +179,14 @@ internal static partial class DeployTool
     {
         log.WriteLine("Running the tests for the changed files...");
         var (code, output) = Run("cmd", "/c " + command, root);
-        var lines = output.Split('\n');
         if (code != 0)
         {
-            log.Error(string.Join('\n', lines.Where(l => l.Contains("[FAIL]") || l.Contains("error") || l.Contains("Failed!") || l.Contains("needs a look") || l.Contains("could not run")).Take(30)));
+            log.Error(string.Join('\n', GateOutput.Why(output)));
             log.Error("The tests for the changed files failed - nothing was pushed or built.");
             return false;
         }
 
-        log.WriteLine("  " + (lines.LastOrDefault(l => l.Contains("Quick check"))?.Trim() ?? "passed"));
+        log.WriteLine("  " + (output.Split('\n').LastOrDefault(l => l.Contains("Quick check"))?.Trim() ?? "passed"));
         return true;
     }
 
