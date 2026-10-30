@@ -1,0 +1,4 @@
+# One line-ending rule for every machine: text files are stored and checked out with LF (the owner, 2026-10-30).
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
