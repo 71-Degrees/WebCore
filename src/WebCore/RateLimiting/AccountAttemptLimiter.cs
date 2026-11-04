@@ -20,18 +20,22 @@ namespace WebCore.RateLimiting;
 /// </summary>
 public sealed class AccountAttemptLimiter
 {
+    /// <summary>The shared ceiling per 10 minutes when an app does not choose its own.</summary>
+    public const int DefaultGlobalMax = 20;
+
     private readonly SlidingWindowRateLimiter _global;
     private readonly KeyedRateLimiter _perAddress;
     private readonly KeyedRateLimiter _perAccount;
 
     /// <summary>
     /// <paramref name="scale"/> multiplies every ceiling (1, the default, is what runs in production). A development or test site raises it so that a whole suite of browser tests, which all come from one address, is not
+    /// <paramref name="globalMax"/> replaces the shared ceiling of 20 per 10 minutes (before scaling); an app with a real audience raises it so a handful of noisy clients cannot lock everyone out, since the per-address and per-account limits are the real protection.
     /// held back by the limits that protect a real site.
     /// </summary>
-    public AccountAttemptLimiter(int scale = 1)
+    public AccountAttemptLimiter(int scale = 1, int? globalMax = null)
     {
         var factor = Math.Max(1, scale);
-        _global = new SlidingWindowRateLimiter(maxInWindow: 20 * factor, window: TimeSpan.FromMinutes(10));
+        _global = new SlidingWindowRateLimiter(maxInWindow: Math.Max(1, globalMax ?? DefaultGlobalMax) * factor, window: TimeSpan.FromMinutes(10));
         _perAddress = new KeyedRateLimiter(maxInWindow: 10 * factor, window: TimeSpan.FromMinutes(10));
         _perAccount = new KeyedRateLimiter(maxInWindow: 10 * factor, window: TimeSpan.FromMinutes(15));
     }

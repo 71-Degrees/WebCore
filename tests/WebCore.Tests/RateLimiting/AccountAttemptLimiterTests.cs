@@ -25,6 +25,25 @@ public class AccountAttemptLimiterTests
     }
 
     [Fact]
+    public void The_shared_ceiling_defaults_to_twenty_and_can_be_raised()
+    {
+        var defaults = new AccountAttemptLimiter();
+        var raised = new AccountAttemptLimiter(globalMax: 30);
+
+        // distinct addresses, so only the shared ceiling can refuse
+        Assert.Equal(20, Enumerable.Range(0, 100).Count(i => defaults.TryAcquire($"192.0.2.{i}")));
+        Assert.Equal(30, Enumerable.Range(0, 100).Count(i => raised.TryAcquire($"192.0.2.{i}")));
+    }
+
+    [Fact]
+    public void The_scale_still_multiplies_a_chosen_shared_ceiling()
+    {
+        var limiter = new AccountAttemptLimiter(scale: 2, globalMax: 30);
+
+        Assert.Equal(60, Enumerable.Range(0, 100).Count(i => limiter.TryAcquire($"192.0.2.{i}")));
+    }
+
+    [Fact]
     public void An_abusive_address_does_not_use_up_the_shared_allowance_real_people_depend_on()
     {
         var limiter = new AccountAttemptLimiter();
