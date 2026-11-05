@@ -30,13 +30,16 @@ public static class ProbePaths
             return true;   // path traversal
         }
 
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
         return ScriptAndSecretExtensions.Any(e => path.EndsWith(e, StringComparison.OrdinalIgnoreCase))
-            || path.Split('/', StringSplitOptions.RemoveEmptyEntries).Any(IsProbeSegment);
+            || segments.Any(s => s.StartsWith('.'))
+            || (segments.Length > 0 && IsScannerTarget(segments[0]));
     }
 
-    /// <summary>A dotfile or dot-folder (<c>.env</c>, <c>.git</c>, <c>.aws</c>), or a segment that starts like a known scanner target.</summary>
-    private static bool IsProbeSegment(string segment) =>
-        segment.StartsWith('.') || ProbeSegmentPrefixes.Any(p => segment.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+    // Only the first segment is held against the scanner names: that is where a scanner asks for them (/wp-admin, /phpmyadmin, /vendor/...). Deeper segments are the site's own values -
+    // a random game code such as PMAX7K, a slug, an id - and matching them 404'd a real page (about one game code in 32,768 starts with "PMA"; found 2026-11-05).
+    private static bool IsScannerTarget(string firstSegment) =>
+        ProbeSegmentPrefixes.Any(p => firstSegment.StartsWith(p, StringComparison.OrdinalIgnoreCase));
 }
 
 /// <summary>Answers scanner requests (see <see cref="ProbePaths"/>) with an empty 404 before anything else runs.</summary>
