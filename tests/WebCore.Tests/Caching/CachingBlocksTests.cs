@@ -160,6 +160,40 @@ public class CachingBlocksTests
         Assert.InRange(kept, 1, 10);
     }
 
+    [Fact]
+    public void Keyed_AtItsLimit_DropsTheOldest_NotEverything()
+    {
+        var cache = new KeyedCache<int, string>(Name(), TimeSpan.FromMinutes(5), () => _now, maxEntries: 10);
+        for (var i = 0; i < 10; i++)
+        {
+            cache.Set(i, "x", cache.Generation);
+            _now = _now.AddSeconds(1);
+        }
+
+        cache.Set(10, "x", cache.Generation);
+
+        Assert.False(cache.TryGet(0, out _));                                    // the oldest went
+        Assert.All(Enumerable.Range(1, 10), i => Assert.True(cache.TryGet(i, out _)));   // the rest stayed
+    }
+
+    [Fact]
+    public void Keyed_AtItsLimit_DropsExpiredEntriesFirst()
+    {
+        var cache = new KeyedCache<int, string>(Name(), TimeSpan.FromSeconds(30), () => _now, maxEntries: 4);
+        cache.Set(0, "fresh", cache.Generation);
+        _now = _now.AddSeconds(-60);
+        for (var i = 1; i < 4; i++)
+        {
+            cache.Set(i, "old", cache.Generation);
+        }
+
+        _now = _now.AddSeconds(60);
+        cache.Set(4, "new", cache.Generation);
+
+        Assert.True(cache.TryGet(0, out _));
+        Assert.True(cache.TryGet(4, out _));
+    }
+
     // ---- counters --------------------------------------------------------------------------------------------------------------------
 
     [Fact]
@@ -237,6 +271,26 @@ public class CachingBlocksTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => first);
         await Assert.ThrowsAsync<InvalidOperationException>(() => second);
         Assert.Equal("ok", await cache.GetOrLoadAsync("k", _ => Task.FromResult<string?>("ok")));
+    }
+
+    [Fact]
+    public async Task GetOrLoad_TheFirstCallerLeaving_DoesNotCancelTheLoadTheOthersWaitOn()
+    {
+        var cache = new KeyedCache<string, string>(Name(), TimeSpan.FromSeconds(30), () => _now);
+        var release = new TaskCompletionSource();
+        using var leaving = new CancellationTokenSource();
+        var tokenSeen = new CancellationToken(true);
+
+        var first = cache.GetOrLoadAsync("pic", async ct => { tokenSeen = ct; await release.Task; return "bytes"; }, leaving.Token);
+        var second = cache.GetOrLoadAsync("pic", _ => Task.FromResult<string?>("never used"));
+        await leaving.CancelAsync();   // the first phone locks
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
+        release.SetResult();
+
+        Assert.Equal("bytes", await second);
+        Assert.False(tokenSeen.CanBeCanceled);
+        Assert.Equal("bytes", await cache.GetOrLoadAsync("pic", _ => Task.FromResult<string?>("not called")));   // and it was kept
     }
 
     [Fact]

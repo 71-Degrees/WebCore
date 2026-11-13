@@ -61,9 +61,9 @@ public sealed class KeyedCache<TKey, TValue> where TKey : notnull where TValue :
             return;
         }
 
-        if (_entries.Count >= _maxEntries)
+        if (_entries.Count >= _maxEntries && !_entries.ContainsKey(key))
         {
-            _entries.Clear();
+            MakeRoom();
         }
 
         _entries[key] = (_copy is null ? value : _copy(value), _now());
@@ -86,12 +86,14 @@ public sealed class KeyedCache<TKey, TValue> where TKey : notnull where TValue :
         if (!TryLead(key, pending, out var leaderTask))
         {
             _counters.Hit(); // shared the leader's read instead of making its own
-            var shared = await leaderTask.ConfigureAwait(false);
+            var shared = await leaderTask.WaitAsync(cancellationToken).ConfigureAwait(false);
             return shared is null ? null : Out(shared);
         }
 
+        // The load is everyone's, so it does not run on the first caller's token: when that caller left (a phone locked), the callers waiting on the same load were all handed its cancellation
+        // (the code review of 2026-11-12). Each caller, the first included, may still stop waiting with its own token; the load then finishes for the others and the cache.
         _counters.Miss();
-        return await LoadAsLeaderAsync(key, pending, load, cancellationToken).ConfigureAwait(false);
+        return await LoadAsLeaderAsync(key, pending, load, CancellationToken.None).WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     // The first caller for a key becomes the leader and loads; any caller arriving while it loads gets the leader's task to wait on.
@@ -169,4 +171,28 @@ public sealed class KeyedCache<TKey, TValue> where TKey : notnull where TValue :
     }
 
     private TValue Out(TValue value) => _copy is null ? value : _copy(value);
+
+    // A full cache used to empty itself, so a few busy keys past the cap reloaded every hot value at once (the code review of 2026-11-12: two or three games preparing their pictures crossed it).
+    // Expired entries go first; if it is still full, the oldest tenth goes, so a full cache is not scanned again for every new key.
+    private void MakeRoom()
+    {
+        var now = _now();
+        foreach (var entry in _entries)
+        {
+            if (now - entry.Value.At >= _timeToLive)
+            {
+                _entries.TryRemove(entry.Key, out _);
+            }
+        }
+
+        if (_entries.Count < _maxEntries)
+        {
+            return;
+        }
+
+        foreach (var key in _entries.OrderBy(e => e.Value.At).Take(Math.Max(1, _maxEntries / 10)).Select(e => e.Key).ToList())
+        {
+            _entries.TryRemove(key, out _);
+        }
+    }
 }
