@@ -280,11 +280,18 @@ internal static class PerfCommands
 
         Console.WriteLine($"  static assets: {immutableOk}/{assets.Count} immutable, {brotliOk}/{assets.Count} Brotli");
         using var font = await http.GetAsync($"{baseUrl}/fonts/plus-jakarta-sans.woff2");
-        if (font.Headers.CacheControl?.MaxAge is null || font.Headers.CacheControl.MaxAge < TimeSpan.FromDays(7))
+        if (FontProblem(font.StatusCode, font.Headers.CacheControl?.MaxAge) is { } problem)
         {
-            problems.Add("fonts are not kept for at least a week");
+            problems.Add(problem);
         }
     }
+
+    /// <summary>The site's web font must be kept for at least a week. A site that has no such font (it answers 404; MyWave uses system fonts) has
+    /// nothing to check - the missing file is not a caching problem.</summary>
+    internal static string? FontProblem(System.Net.HttpStatusCode status, TimeSpan? maxAge) =>
+        status == System.Net.HttpStatusCode.NotFound ? null
+        : maxAge is null || maxAge < TimeSpan.FromDays(7) ? "fonts are not kept for at least a week"
+        : null;
 
     private static string HistoryPath(string name) => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), DeployTool.Config.App + "Deploy", $"perf-{name}.json");
 

@@ -21,4 +21,13 @@ public class PerfAssetsTests
 
         Assert.Equal(new[] { "/app.css?v=3f8a1c2e", "app.vwrdrcqh8w.css", "js/theme.mfpffbovhd.js" }, PerfCommands.VersionedAssets(html));
     }
+
+    [Fact]
+    public void AFontKeptAWeekPasses_AShortOneFails_AndASiteWithNoFontIsNotFaulted()
+    {
+        Assert.Null(PerfCommands.FontProblem(System.Net.HttpStatusCode.OK, TimeSpan.FromDays(30)));
+        Assert.NotNull(PerfCommands.FontProblem(System.Net.HttpStatusCode.OK, TimeSpan.FromHours(1)));
+        Assert.NotNull(PerfCommands.FontProblem(System.Net.HttpStatusCode.OK, null));
+        Assert.Null(PerfCommands.FontProblem(System.Net.HttpStatusCode.NotFound, null));
+    }
 }
