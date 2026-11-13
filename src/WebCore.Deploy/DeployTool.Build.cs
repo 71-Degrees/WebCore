@@ -126,8 +126,12 @@ internal static partial class DeployTool
             return false;
         }
 
-        // Smaller css/js for the wire; the source files stay readable. --no-minify skips it.
-        if (!options.Flag("--no-minify"))
+        // Smaller css/js for the wire; the source files stay readable. --no-minify skips it, and so does an app served by MapStaticAssets (see ServedFromManifest).
+        if (Minifier.ServedFromManifest(publishDir))
+        {
+            Console.WriteLine("Not minifying: this app serves its files through MapStaticAssets, whose build manifest would no longer match changed files.");
+        }
+        else if (!options.Flag("--no-minify"))
         {
             var (minifiedFiles, beforeBytes, afterBytes, skippedFiles) = Minifier.MinifyWebRoot(Path.Combine(publishDir, "wwwroot"));
             Console.WriteLine($"Minified {minifiedFiles} files: {beforeBytes / 1024.0:N1} KB -> {afterBytes / 1024.0:N1} KB{(skippedFiles.Count > 0 ? "; left as is: " + string.Join(", ", skippedFiles) : string.Empty)}");

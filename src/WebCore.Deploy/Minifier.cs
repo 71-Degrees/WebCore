@@ -19,6 +19,14 @@ internal static class Minifier
 {
     private const string Notice = "/* Copyright 2026 71 Degrees. All rights reserved. */\n";
 
+    /// <summary>
+    /// True when the published app serves wwwroot through MapStaticAssets: the build writes a manifest (<c>*.staticwebassets.endpoints.json</c>) holding each
+    /// file's length and hash, and a file changed after the build no longer matches it, so every minified file answered 500 (MyWave, 2026-11-13). Such an
+    /// app gets its compression and fingerprinting from the build instead; only apps on UseStaticFiles are minified here.
+    /// </summary>
+    public static bool ServedFromManifest(string publishDir) =>
+        Directory.Exists(publishDir) && Directory.EnumerateFiles(publishDir, "*.staticwebassets.endpoints.json").Any();
+
     public static (int Files, long Before, long After, List<string> Skipped) MinifyWebRoot(string webRoot)
     {
         var skipped = new List<string>();
