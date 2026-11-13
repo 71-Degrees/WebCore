@@ -137,10 +137,19 @@ internal static partial class DeployTool
 
         var stages = new List<Task<bool>>();
         var touched = GateSkip.ChangedPaths(root);   // null: not known, so every stage runs
-        foreach (var project in projects)
+        if (Config.TestsOneAtATime)
         {
-            var log = timings.Begin("tests: " + Path.GetFileName(project));
-            stages.Add(Task.Run(() => CheckTimings.Run(log, () => RunTestProject(root, project, log))));
+            // All() stops at the first failing project, as the builds above do.
+            if (!projects.All(project => RunTestProjectLogged(root, project, timings.Begin("tests: " + Path.GetFileName(project)))))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            stages.AddRange(projects.Select(project => (Project: project, Log: timings.Begin("tests: " + Path.GetFileName(project))))
+                .ToList()
+                .Select(p => Task.Run(() => RunTestProjectLogged(root, p.Project, p.Log))));
         }
 
         if (changedOnly && Config.ChangedTests is { } changedTests)
@@ -203,6 +212,8 @@ internal static partial class DeployTool
         log.Error($"{Path.GetFileName(project)} does not build - nothing was pushed.");
         return false;
     }
+
+    private static bool RunTestProjectLogged(string root, string project, StageLog log) => CheckTimings.Run(log, () => RunTestProject(root, project, log));
 
     private static bool RunTestProject(string root, string project, StageLog log)
     {

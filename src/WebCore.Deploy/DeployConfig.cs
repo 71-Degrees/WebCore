@@ -150,6 +150,10 @@ public sealed class DeployConfig
     /// no background or nightly run to stand in for it. Default false: a build runs what the pre-push check runs.</summary>
     public bool BuildRunsAllTests { get; init; }
 
+    /// <summary>True: the test projects run one after another instead of side by side. For an app whose browser tests time out when the unit projects load the
+    /// machine at the same time (MyWave's journeys failed twice that way on 2026-11-13, and passed alone). Slower; default false.</summary>
+    public bool TestsOneAtATime { get; init; }
+
     /// <summary>The site whose deploys are releases (tagged in git, grouped on the release-notes page): production, or staging for an app that has no production site.</summary>
     public string ReleaseTarget => Targets.ContainsKey("prod") || !Targets.ContainsKey("stage") ? "prod" : "stage";
 

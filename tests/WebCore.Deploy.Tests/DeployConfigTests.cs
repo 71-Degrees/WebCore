@@ -35,6 +35,16 @@ public sealed class DeployConfigTests : IDisposable
     }
 
     [Fact]
+    public void TestProjectsRunSideBySideUnlessTheAppAsksForOneAtATime()
+    {
+        Write("""{ "app": "Shop", "webProject": "src/Shop.Web" }""");
+        Assert.False(DeployConfig.Load(_root).TestsOneAtATime);
+
+        Write("""{ "app": "Shop", "webProject": "src/Shop.Web", "testsOneAtATime": true }""");
+        Assert.True(DeployConfig.Load(_root).TestsOneAtATime);
+    }
+
+    [Fact]
     public void TheChangedTestsCommandIsOffUnlessTheSettingsGiveOne()
     {
         Write("""{ "app": "Shop", "webProject": "src/Shop.Web" }""");
