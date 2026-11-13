@@ -27,6 +27,8 @@ and a settings file, `deploy/deploy.json`. Run it from the app's repository root
 
 State (the builds that went out, for promotion and rollback) is kept per app under `%LOCALAPPDATA%\<App>Deploy`.
 
+A production deploy is a release: it is tagged `release-yyyy-MM-dd-HHmm` in git, which groups the release notes. An app with only a `stage` target (a test site and no production yet) has its staging deploys tagged instead. A staging build that never answers is replaced by the one that was running; production is never changed without a person.
+
 ## deploy/deploy.json
 
 Only `app`, `webProject` and `targets` are required. Comments and trailing commas are allowed.
@@ -37,6 +39,8 @@ Only `app`, `webProject` and `targets` are required. Comments and trailing comma
   "webProject": "src/Harbor.Web",           // published; release-notes.json is written beside it
   "runtime": "win-x86",
   "tests": [ "tests/Harbor.Core.Tests" ],   // default: every folder under tests/ with a project
+  "changedTests": "dotnet run --project tools/CodeQuality/src/Quality -- quick --since origin/master --no-smells --no-open",   // optional: the push check runs just the tests about the change
+  "buildRunsAllTests": true,                // optional: a build still runs every project in "tests" (for an app with no nightly or background run)
   "compile": [ "src/Harbor.Web", "src/Harbor.Worker" ],   // default: the web project
   "scriptTypeCheck": "npx --no-install tsc -p src/Harbor.Web/tsconfig.json",
   "scriptLint": "npx --no-install eslint src/Harbor.Web/wwwroot/js",
