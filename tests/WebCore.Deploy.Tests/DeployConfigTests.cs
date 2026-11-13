@@ -45,6 +45,31 @@ public sealed class DeployConfigTests : IDisposable
     }
 
     [Theory]
+    [InlineData(null, false, false, false)]          // no changed-tests command: every project, always
+    [InlineData("quick", false, false, true)]        // the push check runs just the changed tests
+    [InlineData("quick", false, true, true)]         // and so does a build, by default
+    [InlineData("quick", true, false, true)]         // buildRunsAllTests leaves the push check alone
+    [InlineData("quick", true, true, false)]         // but a build then runs every project
+    public void ABuildRunsEveryTestProjectOnlyWhenTheAppAsks(string? changedTests, bool buildRunsAllTests, bool forBuild, bool changedOnly)
+    {
+        var config = new DeployConfig { ChangedTests = changedTests, BuildRunsAllTests = buildRunsAllTests };
+
+        Assert.Equal(changedOnly, config.RunsChangedTestsOnly(forBuild));
+    }
+
+    [Theory]
+    [InlineData(new[] { "prod", "stage" }, "prod")]
+    [InlineData(new[] { "prod" }, "prod")]
+    [InlineData(new[] { "stage" }, "stage")]     // an app whose only site is staging: its staging deploys are its releases
+    [InlineData(new string[0], "prod")]
+    public void ReleasesAreProductionDeploys_OrStagingWhenThereIsNoProduction(string[] targets, string expected)
+    {
+        var config = new DeployConfig { Targets = targets.ToDictionary(t => t, _ => new Target("a", "g", "https://x", "K")) };
+
+        Assert.Equal(expected, config.ReleaseTarget);
+    }
+
+    [Theory]
     [InlineData("""{ "webProject": "src/Web" }""")]
     [InlineData("""{ "app": "Shop" }""")]
     public void TheAppAndWebProjectAreRequired(string json)

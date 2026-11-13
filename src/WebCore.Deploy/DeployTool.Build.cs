@@ -94,7 +94,7 @@ internal static partial class DeployTool
     /// <summary>A build must be of a commit whose tests pass, so the tests run first (--skip-tests overrides) and uncommitted changes under src/ stop it (--allow-dirty overrides).</summary>
     private static bool MayBuild(string root, Options options)
     {
-        if (!options.Flag("--skip-tests") && !RunChecks(root, includeWebBuild: false))
+        if (!options.Flag("--skip-tests") && !RunChecks(root, includeWebBuild: false, forBuild: true))
         {
             Console.Error.WriteLine("Not building: the tests must pass first (--skip-tests to override, though you shouldn't).");
             return false;

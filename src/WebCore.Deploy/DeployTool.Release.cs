@@ -313,12 +313,16 @@ internal static partial class DeployTool
         return false;
     }
 
-    // Tag and announce a production deploy, then time the key pages and read what the live site says (both report-only here; `verify` itself exits non-zero on a failure).
+    // Tag a release (production, or staging for an app with no production site) and announce a production deploy, then time the key pages and read what the live site says (both report-only here; `verify` itself exits non-zero on a failure).
     private static async Task AfterDeployAsync((string Name, Target Target, Options Options) t, string version, bool isRollback)
     {
-        if (t.Name == "prod" && !isRollback)
+        if (t.Name == Config.ReleaseTarget && !isRollback)
         {
             ReleaseNotesCommand.TagDeployedBuild(RepoRoot(), version.Split('+').Last(), DateTimeOffset.UtcNow);
+        }
+
+        if (t.Name == "prod" && !isRollback)
+        {
             await SubmitToIndexNowAsync(RepoRoot(), t.Target.Url);
         }
 

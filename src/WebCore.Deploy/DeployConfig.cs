@@ -146,6 +146,16 @@ public sealed class DeployConfig
     /// <summary>A command (run from the repository root, exit code 0 = pass) that runs just the tests the change touches, in place of every test project. When set, the pre-push check runs it instead of building and running all of <see cref="Tests"/>; the full suite is left to the background run. Default: none, every test project runs.</summary>
     public string? ChangedTests { get; init; }
 
+    /// <summary>True: a build (stage, prod --build, build) runs every project in <see cref="Tests"/> even when <see cref="ChangedTests"/> is set, so a deploy is of a commit whose whole suite passed. For an app with
+    /// no background or nightly run to stand in for it. Default false: a build runs what the pre-push check runs.</summary>
+    public bool BuildRunsAllTests { get; init; }
+
+    /// <summary>The site whose deploys are releases (tagged in git, grouped on the release-notes page): production, or staging for an app that has no production site.</summary>
+    public string ReleaseTarget => Targets.ContainsKey("prod") || !Targets.ContainsKey("stage") ? "prod" : "stage";
+
+    /// <summary>Whether a check runs only the <see cref="ChangedTests"/> command instead of every test project; <paramref name="forBuild"/> is true for the check before a build.</summary>
+    public bool RunsChangedTestsOnly(bool forBuild) => !string.IsNullOrWhiteSpace(ChangedTests) && !(forBuild && BuildRunsAllTests);
+
     /// <summary>The projects compiled by the pre-push check (the web app, a worker). Default: just the web project.</summary>
     public string[]? Compile { get; init; }
 

@@ -85,13 +85,13 @@ internal static partial class DeployTool
         return passed;
     }
 
-    private static bool RunChecks(string root, bool includeWebBuild, bool startBackground = false)
+    private static bool RunChecks(string root, bool includeWebBuild, bool startBackground = false, bool forBuild = false)
     {
         var timings = new CheckTimings();
         var passed = false;
         try
         {
-            passed = RunStages(root, includeWebBuild, timings);
+            passed = RunStages(root, includeWebBuild, timings, forBuild);
             return passed;
         }
         finally
@@ -121,10 +121,11 @@ internal static partial class DeployTool
         }
     }
 
-    private static bool RunStages(string root, bool includeWebBuild, CheckTimings timings)
+    private static bool RunStages(string root, bool includeWebBuild, CheckTimings timings, bool forBuild)
     {
-        // With "changedTests" set only the tests the change touches run here (that command builds what it needs); every project is built and run otherwise.
-        var projects = string.IsNullOrWhiteSpace(Config.ChangedTests) ? Config.TestProjects(root) : [];
+        // With "changedTests" set only the tests the change touches run here (that command builds what it needs); every project is built and run otherwise, and before a build when "buildRunsAllTests" says so.
+        var changedOnly = Config.RunsChangedTestsOnly(forBuild);
+        var projects = changedOnly ? [] : Config.TestProjects(root);
         foreach (var project in projects)
         {
             var build = timings.Begin("build: " + Path.GetFileName(project));
@@ -142,10 +143,10 @@ internal static partial class DeployTool
             stages.Add(Task.Run(() => CheckTimings.Run(log, () => RunTestProject(root, project, log))));
         }
 
-        if (!string.IsNullOrWhiteSpace(Config.ChangedTests))
+        if (changedOnly && Config.ChangedTests is { } changedTests)
         {
             var changed = timings.Begin("tests: the ones for the changed files");
-            stages.Add(Task.Run(() => CheckTimings.Run(changed, () => RunChangedTests(root, Config.ChangedTests, changed))));
+            stages.Add(Task.Run(() => CheckTimings.Run(changed, () => RunChangedTests(root, changedTests, changed))));
         }
 
         if (includeWebBuild && GateScope.NeedsCompile(touched))
