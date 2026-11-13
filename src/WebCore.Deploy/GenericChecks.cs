@@ -109,11 +109,11 @@ internal static class GenericChecks
             : new[] { new VerifyOutcome(VerifyResult.Pass, "information pages are static", $"no live connection on {settings.StaticPages.Length} information page(s); {settings.InteractivePages.Length} interactive page(s) still have one") };
     }
 
-    // Discoverability files: production is open to search engines, staging must keep them out.
+    // Discoverability files: the public site (production, or the staging site of an app with no production) is open to search engines; any other must keep them out.
     private static async Task<IReadOnlyList<VerifyOutcome>> SeoFilesAsync(VerifyContext context)
     {
         var robots = await context.GetAsync("/robots.txt").ConfigureAwait(false);
-        if (context.TargetName != "prod")
+        if (!context.IsPublicSite)
         {
             return new[] { Expect("robots.txt keeps crawlers out", robots, 200, b => Regex.IsMatch(b, @"Disallow:\s*/\s*$", RegexOptions.Multiline), "disallows everything") };
         }
@@ -190,14 +190,21 @@ internal static class GenericChecks
             }
         }
 
-        var unstamped = paths.Where(p => !p.Contains("?v=", StringComparison.Ordinal)).ToList();
+        var unstamped = paths.Where(p => !IsVersioned(p)).ToList();
         if (broken.Count > 0)
         {
             return new(VerifyResult.Fail, "scripts and styles", "did not load: " + string.Join(", ", broken));
         }
 
         return unstamped.Count > 0
-            ? new(VerifyResult.Fail, "scripts and styles", "no version stamp (?v=) on: " + string.Join(", ", unstamped))
+            ? new(VerifyResult.Fail, "scripts and styles", "no version stamp (?v= or a fingerprinted name) on: " + string.Join(", ", unstamped))
             : new(VerifyResult.Pass, "scripts and styles", $"{paths.Count} files, all stamped and loading");
     }
+
+    // MapStaticAssets puts a 10-character fingerprint in the file name (app.vwrdrcqh8w.css, MyWave.Web.t73l5p819p.styles.css), which changes with the content as surely as a ?v= stamp.
+    private static readonly Regex Fingerprinted = new(@"\.[a-z0-9]{10}\.[A-Za-z0-9.]*(css|js|mjs)$", RegexOptions.Compiled);
+
+    /// <summary>True when a browser can never keep a stale copy across a deploy: a <c>?v=</c> stamp (StaticAssetVersion) or a fingerprint in the file name (MapStaticAssets).</summary>
+    internal static bool IsVersioned(string path) =>
+        path.Contains("?v=", StringComparison.Ordinal) || Fingerprinted.IsMatch(path.Split('?')[0].Split('/')[^1]);
 }

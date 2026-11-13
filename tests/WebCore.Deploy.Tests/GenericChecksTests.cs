@@ -75,4 +75,36 @@ public class GenericChecksTests
         Assert.Equal(VerifyResult.Pass, outcomes.Single(o => o.Name == "security headers").Result);
         Assert.Equal(VerifyResult.Pass, outcomes.Single(o => o.Name == "scripts and styles").Result);
     }
+
+    [Theory]
+    [InlineData("/app.css?v=3f8a1c2e", true)]
+    [InlineData("app.vwrdrcqh8w.css", true)]                          // MapStaticAssets
+    [InlineData("MyWave.Web.t73l5p819p.styles.css", true)]            // scoped CSS bundle
+    [InlineData("Components/Layout/ReconnectModal.6n6hxedbbv.razor.js", true)]
+    [InlineData("js/theme.js", false)]
+    [InlineData("js/site.min.js", false)]
+    public void AScriptIsVersionedByAStampOrAFingerprintInItsName(string path, bool versioned) =>
+        Assert.Equal(versioned, GenericChecks.IsVersioned(path));
+
+    [Fact]
+    public async Task TheStagingSiteOfAnAppWithNoProduction_IsCheckedAsThePublicSite()
+    {
+        var home = new Reply(200, "<link rel=\"stylesheet\" href=\"/app.vwrdrcqh8w.css\">", new HashSet<string>(), null);
+        var pages = new (string, HttpStatusCode, string)[]
+        {
+            ("/robots.txt", HttpStatusCode.OK, "User-agent: *\nAllow: /\nSitemap: https://site.test/sitemap.xml"),
+            ("/sitemap.xml", HttpStatusCode.OK, "<urlset></urlset>"), ("/llms.txt", HttpStatusCode.OK, "# Site"), ("/app.vwrdrcqh8w.css", HttpStatusCode.OK, "a{}"),
+        };
+        var handler = new FakeSite(pages.ToDictionary(p => p.Item1, p => (p.Item2, p.Item3)));
+        var publicStaging = new VerifyContext(new HttpClient(handler), "https://site.test", "stage", publicSite: true);
+        var hiddenStaging = new VerifyContext(new HttpClient(handler), "https://site.test", "stage");
+
+        var asPublic = await GenericChecks.RunSiteChecksAsync(publicStaging, new VerifySettings(), home);
+        var asHidden = await GenericChecks.RunSiteChecksAsync(hiddenStaging, new VerifySettings(), home);
+
+        Assert.Equal(VerifyResult.Pass, asPublic.Single(o => o.Name == "robots.txt").Result);
+        Assert.Equal(VerifyResult.Pass, asPublic.Single(o => o.Name == "sitemap.xml").Result);
+        Assert.Equal(VerifyResult.Pass, asPublic.Single(o => o.Name == "scripts and styles").Result);
+        Assert.Equal(VerifyResult.Fail, asHidden.Single(o => o.Name == "robots.txt keeps crawlers out").Result);
+    }
 }

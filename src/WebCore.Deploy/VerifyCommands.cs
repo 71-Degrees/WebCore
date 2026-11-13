@@ -22,7 +22,7 @@ internal static class VerifyCommands
     {
         using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(30) };
         var baseUrl = target.Url.TrimEnd('/');
-        var context = new VerifyContext(http, baseUrl, name);
+        var context = new VerifyContext(http, baseUrl, name, publicSite: name == DeployTool.Config.ReleaseTarget);
         var settings = DeployTool.Config.Verify;
 
         var expected = options.Value("--expect") ?? (DeployTool.LoadState().Current.TryGetValue(name, out var current) ? current.Version : null);

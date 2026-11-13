@@ -21,12 +21,16 @@ public sealed record VerifyOutcome(VerifyResult Result, string Name, string Deta
 public sealed record Reply(int Status, string Body, IReadOnlySet<string> Headers, string? Location);
 
 /// <summary>What a check is given: a way to load pages of the site being verified (without following redirects), its address, and which target it is.</summary>
-public sealed class VerifyContext(HttpClient http, string baseUrl, string targetName)
+/// <param name="publicSite">Whether this is the site the public uses (open to search engines). Default: production only; an app with no production site passes true for its staging site.</param>
+public sealed class VerifyContext(HttpClient http, string baseUrl, string targetName, bool? publicSite = null)
 {
     public string BaseUrl { get; } = baseUrl;
 
     /// <summary>"stage" or "prod": production is open to search engines and staging is not, among other differences.</summary>
     public string TargetName { get; } = targetName;
+
+    /// <summary>True for the site the public uses: production, or the staging site of an app that has no production (see <see cref="DeployConfig.ReleaseTarget"/>). It must be open to search engines; any other must keep them out.</summary>
+    public bool IsPublicSite { get; } = publicSite ?? targetName == "prod";
 
     /// <summary>Loads a page of the site, never throwing: a failure to connect is a reply with status 0.</summary>
     public async Task<Reply> GetAsync(string path)
