@@ -216,6 +216,14 @@ internal static class PerfCommands
 
     private static double Percentile(List<double> sorted, double p) => sorted[Math.Min(sorted.Count - 1, (int)Math.Ceiling(p * sorted.Count) - 1)];
 
+    /// <summary>The site's own stylesheets and scripts the home page links that carry a version: a ?v= stamp or a MapStaticAssets fingerprint (<see cref="GenericChecks.IsVersioned"/>).</summary>
+    internal static List<string> VersionedAssets(string html) =>
+        Regex.Matches(html, @"(?:href|src)=""([^""]+\.(?:css|js)(?:\?[^""]*)?)""")
+            .Select(m => System.Net.WebUtility.HtmlDecode(m.Groups[1].Value))
+            .Where(p => !p.StartsWith("http", StringComparison.OrdinalIgnoreCase) && GenericChecks.IsVersioned(p))
+            .Distinct()
+            .ToList();
+
     /// <summary>The hashed stylesheet and scripts the home page links must be kept for a year and sent Brotli-compressed; fonts and images for a month.</summary>
     private static async Task CheckStaticAssets(HttpClient http, string baseUrl, List<string> problems)
     {
@@ -230,10 +238,10 @@ internal static class PerfCommands
             return;
         }
 
-        var assets = Regex.Matches(html, @"(?:href|src)=""([^""]+\.(?:css|js)\?v=[a-f0-9]+)""").Select(m => m.Groups[1].Value).Distinct().ToList();
+        var assets = VersionedAssets(html);
         if (assets.Count == 0)
         {
-            problems.Add("the home page links no versioned css/js (?v=...)");
+            problems.Add("the home page links no versioned css/js (?v=... or a fingerprinted name)");
             return;
         }
 
