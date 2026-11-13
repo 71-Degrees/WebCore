@@ -46,7 +46,7 @@ public record ReleaseNotes(string RepoUrl, DateTimeOffset GeneratedAt, string Bu
 public static class CommitClassifier
 {
     private static readonly Regex Fix = new(@"\b(fix(es|ed)?|bug|broken|crash(es)?|repair(s|ed)?|resolve[sd]?|correct(s|ed)?|regression|hotfix)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex Behind = new(@"\b(docs?|documentation|readme|claude\.md|unit tests?|tests for|test coverage|refactor(ed|s)?|chore|tooling|runbook|deploy(ment)? tool|ci|gitignore|cleanup|clean up|rename[sd]?|lint|build script)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex Behind = new(@"\b(docs?|documentation|readme|claude\.md|unit tests?|tests for|test coverage|refactor(ed|s)?|chore|tooling|runbook|deploy(ment)? tool|ci|gitignore|cleanup|clean up|rename[sd]?|lint|build script|bump(s|ed)?|dependabot|dependenc(y|ies))\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex Improve = new(@"\b(improv\w+|polish\w*|tweak\w*|tun(e|es|ed|ing)|updat\w+|refin\w+|rework\w*|simplif\w+|faster|speed\w*|reduc\w+|hide[sd]?|remov\w+|drop(s|ped)?|shorten\w*|tighten\w*|smaller|larger|change[sd]?|switch\w*|move[sd]?|keeps?|stop(s)?|no longer|instead)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static ChangeCategory Classify(string subject)

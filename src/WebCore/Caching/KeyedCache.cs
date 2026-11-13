@@ -158,6 +158,20 @@ public sealed class KeyedCache<TKey, TValue> where TKey : notnull where TValue :
         _counters.Invalidated();
     }
 
+    /// <summary>Forgets one key (a write to one person's data): its entry, and any load of it already in flight. The generation still bumps, so a load of
+    /// another key that started before this write simply isn't stored - it's just re-read next time.</summary>
+    public void Invalidate(TKey key)
+    {
+        Interlocked.Increment(ref _generation);
+        _entries.TryRemove(key, out _);
+        lock (_inflightGate)
+        {
+            _inflight.Remove(key);
+        }
+
+        _counters.Invalidated();
+    }
+
     private bool Lookup(TKey key, out TValue value)
     {
         if (_entries.TryGetValue(key, out var entry) && _now() - entry.At < _timeToLive)

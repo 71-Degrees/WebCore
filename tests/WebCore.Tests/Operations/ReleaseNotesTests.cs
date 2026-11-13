@@ -19,6 +19,7 @@ public class ReleaseNotesTests
     [InlineData("Host reveal: hide the leaderboard heading and shrink the flag", ChangeCategory.Improvement)]
     [InlineData("Runbook for the Key Vault and staging app setup", ChangeCategory.BehindTheScenes)]
     [InlineData("Split CLAUDE.md into task guides", ChangeCategory.BehindTheScenes)]
+    [InlineData("Bump Azure.Storage.Blobs to 12.29.2", ChangeCategory.BehindTheScenes)]
     [InlineData("Shareable self-hosted preview: /demo/{quizId} plays any quiz solo", ChangeCategory.Feature)]
     [InlineData("Support Openverse as a second image source", ChangeCategory.Feature)]
     public void Classify_ReadsTheWording(string subject, ChangeCategory expected) =>

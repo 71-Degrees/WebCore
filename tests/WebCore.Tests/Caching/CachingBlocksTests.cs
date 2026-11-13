@@ -121,6 +121,23 @@ public class CachingBlocksTests
     }
 
     [Fact]
+    public void Keyed_InvalidatingOneKey_KeepsTheOthers_AndDropsLoadsStartedBeforeIt()
+    {
+        var cache = new KeyedCache<string, string>(Name(), TimeSpan.FromSeconds(30), () => _now);
+        cache.Set("a", "1", cache.Generation);
+        cache.Set("b", "2", cache.Generation);
+        var generation = cache.Generation;
+
+        cache.Invalidate("a");
+        cache.Set("c", "stale", generation); // a read of another key that began before the write
+
+        Assert.False(cache.TryGet("a", out _));
+        Assert.True(cache.TryGet("b", out var kept));
+        Assert.Equal("2", kept);
+        Assert.False(cache.TryGet("c", out _));
+    }
+
+    [Fact]
     public void Keyed_AValueLoadedBeforeAWrite_IsNeverStored()
     {
         var cache = new KeyedCache<string, string>(Name(), TimeSpan.FromSeconds(30), () => _now);
