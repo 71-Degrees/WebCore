@@ -93,4 +93,15 @@ Lookups by email read the store directly (one document). `StorageCalls` wraps bo
 - App-only account fields (Better Trivia's `SignupIp`, confirmation counters, team name, avatar) survive in `UnknownFields`; read them through an app-side
   accessor, or keep them in an app-owned document.
 - Keep the app's cookie names, claim prefix, log category and store names in `AccountOptions`.
-- Extras that stay app-side: signup screening, Tor list, canary account, a remembered (persistent) sign-in, keeping typed emails out of URLs.
+- Extras that stay app-side: canary account, email canonicalizing, SendGrid/SMTP senders, the customer email opt-out.
+
+Gaps to close in WebCore before Better Trivia can switch (each small; checked against its code 2026-11-16):
+
+- **Typed profile fields:** Better Trivia's profile has about 12 more (CreatedAt, content terms, nearby digest, `ShowOnLeaderboard` defaulting to true,
+  team name, avatar, AI hosting). `UnknownFields` keeps them, but typed access and a true default want a generic repository
+  (`UserProfileRepository<TProfile> where TProfile : UserProfile`).
+- **A signup hook** (`IAccountSignupPolicy`, no-op by default) for its signup screening and Tor list.
+- **Remembered sign-in:** an `AccountOptions` switch for its persistent cookie.
+- **Emails kept out of URLs:** its `AccountFormMemory`; WebCore's redirects carry `email=` as CrateDigger's did.
+- Its renames: claim prefix `tn:`; `Request/ConfirmPasswordResetCodeAsync` are `Request/ConfirmPasswordResetAsync` here; its own `AccountEmailOptions`
+  clashes by name with this one.
