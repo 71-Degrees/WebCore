@@ -287,6 +287,50 @@ public sealed class LiveSettingsServiceTests
     }
 
     [Fact]
+    public async Task PeekServesTheLastKnownValueAtOnceAndAFirstReadFillsItInTheBackground()
+    {
+        var store = new MemoryStore();
+        store.Documents["production.json"] = new LiveSettingsDocument { Values = { [Limit.Key] = new LiveSettingEntry("45", "o", DateTimeOffset.UnixEpoch) } };
+        using var settings = Make(store, new ManualTime());
+
+
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (settings.Peek(Limit) != 45 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(10);
+        }
+
+        Assert.Equal(45, settings.Peek(Limit));
+    }
+
+    [Fact]
+    public async Task PeekSeesASaveMadeHereAtOnce()
+    {
+        using var settings = Make(new MemoryStore(), new ManualTime());
+        await settings.ListAsync();
+
+        await settings.SetAsync(Switch.Key, "true", "owner");
+
+        Assert.True(settings.Peek(Switch));
+    }
+
+    [Fact]
+    public async Task PeekKeepsServingTheLastValueWhileTheStoreIsDownAndNeverThrows()
+    {
+        var store = new MemoryStore();
+        var time = new ManualTime();
+        using var settings = Make(store, time);
+        await settings.SetAsync(Limit.Key, "90", "owner");
+        store.FailReads = true;
+
+        time.Advance(TimeSpan.FromMinutes(5));
+
+        Assert.Equal(90, settings.Peek(Limit));
+        await Task.Delay(100);
+        Assert.Equal(90, settings.Peek(Limit));
+    }
+
+    [Fact]
     public void ADefaultThatBreaksItsOwnRuleFailsWhenBuilt()
     {
         Assert.Throws<ArgumentException>(() => LiveSettingFactory.WholeNumber("X", 5, 10, 20, "d", "g"));

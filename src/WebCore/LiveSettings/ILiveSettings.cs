@@ -14,6 +14,12 @@ public interface ILiveSettings
 {
     Task<T> GetAsync<T>(LiveSettingDefinition<T> definition, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The value now, without waiting, for code that cannot await (a property read on every request). It serves the last document this server read or saved (the default until the first read finishes,
+    /// so warm it once at startup with <see cref="ListAsync"/>), and refreshes it in the background once the cache time is up. A change elsewhere is seen within about two cache times.
+    /// </summary>
+    T Peek<T>(LiveSettingDefinition<T> definition);
+
     /// <summary>Every registered tunable with the value in force, for the editor page.</summary>
     Task<IReadOnlyList<LiveSettingView>> ListAsync(CancellationToken cancellationToken = default);
 

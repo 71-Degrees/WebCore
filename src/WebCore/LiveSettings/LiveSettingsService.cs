@@ -28,6 +28,11 @@ public sealed class LiveSettingsService : ILiveSettings, IDisposable
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private readonly ConcurrentDictionary<string, DateTimeOffset> _warned = new(StringComparer.Ordinal);
 
+    // What Peek serves without waiting: the last document read or saved here (defaults until the first read completes), refreshed in the background once the time-to-live is up.
+    private LiveSettingsDocument _lastKnown = new();
+    private long _nextRefreshTicks;
+    private int _refreshing;
+
     public LiveSettingsService(IKeyedDocumentStore store, IEnumerable<LiveSettingDefinition> definitions, LiveSettingsOptions options, TimeProvider? timeProvider = null)
     {
         _store = store;
@@ -42,6 +47,36 @@ public sealed class LiveSettingsService : ILiveSettings, IDisposable
     public async Task<T> GetAsync<T>(LiveSettingDefinition<T> definition, CancellationToken cancellationToken = default)
     {
         var document = await ReadDocumentAsync(cancellationToken).ConfigureAwait(false);
+        return ValueFrom(definition, document);
+    }
+
+    public T Peek<T>(LiveSettingDefinition<T> definition)
+    {
+        var now = _time.GetUtcNow();
+        if (now.UtcTicks >= Volatile.Read(ref _nextRefreshTicks) && Interlocked.CompareExchange(ref _refreshing, 1, 0) == 0)
+        {
+            Volatile.Write(ref _nextRefreshTicks, (now + _options.CacheTimeToLive).UtcTicks);
+            _ = RefreshInBackgroundAsync();
+        }
+
+        return ValueFrom(definition, Volatile.Read(ref _lastKnown));
+    }
+
+    // Never throws (the read it runs swallows store failures), so a forgotten task cannot fault unobserved. The next attempt waits a full time-to-live even after a failure.
+    private async Task RefreshInBackgroundAsync()
+    {
+        try
+        {
+            await ReadDocumentAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        finally
+        {
+            Volatile.Write(ref _refreshing, 0);
+        }
+    }
+
+    private T ValueFrom<T>(LiveSettingDefinition<T> definition, LiveSettingsDocument document)
+    {
         if (!document.Values.TryGetValue(definition.Key, out var entry))
         {
             return definition.Default;
@@ -113,6 +148,7 @@ public sealed class LiveSettingsService : ILiveSettings, IDisposable
             apply(document);
             await _store.SetAsync(_documentName, document, cancellationToken).ConfigureAwait(false);
             _cache.Invalidate();
+            Volatile.Write(ref _lastKnown, document);
             await RecordAsync(new LiveSettingChange(definition.Key, oldText, newText, changedBy, _time.GetUtcNow()), cancellationToken).ConfigureAwait(false);
             return LiveSettingResult.Ok;
         }
@@ -145,7 +181,9 @@ public sealed class LiveSettingsService : ILiveSettings, IDisposable
     {
         try
         {
-            return await _cache.GetAsync(async ct => await _store.GetAsync<LiveSettingsDocument>(_documentName, ct).ConfigureAwait(false) ?? new LiveSettingsDocument(), cancellationToken).ConfigureAwait(false);
+            var document = await _cache.GetAsync(async ct => await _store.GetAsync<LiveSettingsDocument>(_documentName, ct).ConfigureAwait(false) ?? new LiveSettingsDocument(), cancellationToken).ConfigureAwait(false);
+            Volatile.Write(ref _lastKnown, document.Copy());
+            return document;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
