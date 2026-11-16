@@ -1,0 +1,120 @@
+/*
+ * ---------------------------------------------------------------------------
+ * Copyright © 2026 71 Degrees. All rights reserved.
+ * ---------------------------------------------------------------------------
+ */
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using WebCore.Accounts;
+using WebCore.Caching;
+using WebCore.Email;
+
+namespace WebCore.Hosting.Accounts;
+
+/// <summary>Policy names for <c>[Authorize(Policy = ...)]</c> and <c>RequireAuthorization(...)</c>.</summary>
+public static class AccountPolicies
+{
+    /// <summary>Requires the role claim to be the app's <see cref="AccountRoles.Admin"/>.</summary>
+    public const string Admin = "Admin";
+}
+
+/// <summary>
+/// Accounts for an app in one call: users and profiles (cached, see docs/accounts.md), emailed codes, passwords, the sign-in cookie with its checks, and
+/// the Admin policy. The app registers its email sender first (or none), then calls this, then <see cref="AccountEndpoints.MapWebCoreAccountEndpoints"/>.
+/// Reads the same configuration keys every app already sets: <c>Auth:AdminEmails</c> and <c>AccountEmail:*</c>.
+/// </summary>
+public static class AccountRegistration
+{
+    public static WebApplicationBuilder AddWebCoreAccounts(this WebApplicationBuilder builder, Action<AccountOptions> configure)
+    {
+        var options = new AccountOptions();
+        configure(options);
+        options.Validate();
+
+        var services = builder.Services;
+        services.AddSingleton(options);
+        services.AddSingleton(options.Roles!);
+        services.AddSingleton(new AccountClaims(options.ClaimPrefix));
+        AddRepositories(services, options);
+
+        // Unconfigured email is safely off: a sender that only logs, never a startup crash for a missing secret.
+        services.TryAddSingleton<IEmailSender, NullEmailSender>();
+        var emailOptions = EmailOptions(builder, options);
+        services.AddSingleton(emailOptions);
+        services.AddSingleton(sp => new AccountEmailService(
+            sp.GetRequiredService<IUserRepository>(),
+            sp.GetRequiredService<IUserProfileRepository>(),
+            sp.GetRequiredService<IEmailSender>(),
+            options.Roles!,
+            emailOptions,
+            onSendFailure: ex => Log(sp, options).LogWarning(ex, "Could not send a code email")));
+        services.AddSingleton(sp => new PasswordService(
+            sp.GetRequiredService<IUserRepository>(),
+            sp.GetRequiredService<IEmailSender>(),
+            emailOptions,
+            sp.GetService<TimeProvider>(),
+            ex => Log(sp, options).LogWarning(ex, "Could not send a password-changed notice")));
+
+        services.AddSingleton<AccountRateLimits>();
+        services.AddSingleton<AccountSignIn>();
+        services.AddSingleton<AccountServicesBundle>();
+        services.AddSingleton(new AccountSessionEvents(options, AdminEmails(builder.Configuration)));
+        AddCookie(services, options);
+        services.AddAuthorizationBuilder().AddPolicy(AccountPolicies.Admin, policy => policy.RequireRole(options.Roles!.Admin));
+        return builder;
+    }
+
+    // Both are wrapped in short-lived caches because the cookie check reads a profile and an account on every request; StorageCalls (under the cache)
+    // counts what gets through to real storage for the read budgets.
+    private static void AddRepositories(IServiceCollection services, AccountOptions options)
+    {
+        services.AddSingleton<IUserRepository>(_ => new CachedUserRepository(StorageCalls.Wrap<IUserRepository>(new UserRepository(options.UsersStore!))));
+        services.AddSingleton<IUserProfileRepository>(sp => new CachedUserProfileRepository(
+            StorageCalls.Wrap<IUserProfileRepository>(new UserProfileRepository(options.ProfilesStore!, options.Roles!, sp.GetService<TimeProvider>()))));
+    }
+
+    // Local development never emails codes by default (a dev machine may hold real secrets, and casual testing must not email anyone): the code shows
+    // on screen instead. AccountEmail:SendInDevelopment=true sends for real.
+    private static AccountEmailOptions EmailOptions(WebApplicationBuilder builder, AccountOptions options)
+    {
+        var config = builder.Configuration;
+        var isDevelopment = builder.Environment.IsDevelopment();
+        var sendForReal = options.EmailDeliveryConfigured && (!isDevelopment || config.GetValue<bool>("AccountEmail:SendInDevelopment"));
+        return new AccountEmailOptions(
+            options.BrandName,
+            sendForReal,
+            ExposeCodeForDevelopment: isDevelopment,
+            MaxPerClientPerHour: config.GetValue("AccountEmail:MaxPerClientPerHour", AccountEmailService.DefaultMaxPerClientPerHour),
+            MaxPerHour: config.GetValue("AccountEmail:MaxPerHour", AccountEmailService.DefaultMaxPerHour),
+            MaxPerDay: config.GetValue("AccountEmail:MaxPerDay", AccountEmailService.DefaultMaxPerDay));
+    }
+
+    /// <summary>The addresses in <c>Auth:AdminEmails</c> (comma-separated), lower-cased.</summary>
+    public static IReadOnlySet<string> AdminEmails(IConfiguration config) =>
+        (config["Auth:AdminEmails"] ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(e => e.ToLowerInvariant())
+            .ToHashSet();
+
+    private static void AddCookie(IServiceCollection services, AccountOptions options)
+    {
+        services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+            .AddCookie(cookie =>
+            {
+                cookie.Cookie.Name = options.CookieName;
+                cookie.Cookie.HttpOnly = true;
+                cookie.Cookie.SameSite = SameSiteMode.Lax;
+                cookie.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                cookie.ExpireTimeSpan = options.CookieLifetime;
+                cookie.SlidingExpiration = true;
+                cookie.LoginPath = options.LoginPath;
+                cookie.AccessDeniedPath = options.DeniedPath;
+                cookie.Events.OnSignedIn = context => context.HttpContext.RequestServices.GetRequiredService<AccountSessionEvents>().SignedInAsync(context);
+                cookie.Events.OnValidatePrincipal = context => context.HttpContext.RequestServices.GetRequiredService<AccountSessionEvents>().ValidateAsync(context);
+            });
+    }
+
+    private static ILogger Log(IServiceProvider services, AccountOptions options) =>
+        services.GetRequiredService<ILoggerFactory>().CreateLogger(options.LogCategory);
+}
