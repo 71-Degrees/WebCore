@@ -12,6 +12,7 @@
   <ItemGroup>
     <!-- Backs BlobJsonStore, the production document store; only used when Storage:ConnectionString is configured, so local dev keeps the file-backed stores with no Azure dependency. -->
     <PackageReference Include="Azure.Storage.Blobs" Version="12.29.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
   </ItemGroup>
 
 </Project>

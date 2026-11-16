@@ -17,14 +17,6 @@ using WebCore.Storage;
 
 namespace WebCore.Hosting.Audit;
 
-/// <summary>What an app tells the audit trail: how much to keep, and which top-level fields of its items no person needs to see in a change (bulky or bookkeeping).</summary>
-public sealed record AuditTrailOptions
-{
-    public AuditLogOptions Log { get; init; } = new();
-
-    public IReadOnlySet<string> IgnoredFields { get; init; } = AuditDiff.DefaultIgnored;
-}
-
 /// <summary>
 /// The audit trail for an app in two calls: <c>services.AddAuditTrail(store)</c> registers the actor context, the log in the app's own store, the auditor and the Blazor
 /// circuit handler; <c>app.UseAuditActors()</c>, after authentication, makes each request's signed-in person the actor. The app then wraps its own repositories with

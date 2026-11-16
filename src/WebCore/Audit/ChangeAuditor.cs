@@ -5,9 +5,16 @@
  */
 using System.Globalization;
 using Microsoft.Extensions.Logging;
-using WebCore.Audit;
 
-namespace WebCore.Hosting.Audit;
+namespace WebCore.Audit;
+
+/// <summary>What an app tells the audit trail: how much to keep, and which top-level fields of its items no person needs to see in a change (bulky or bookkeeping).</summary>
+public sealed record AuditTrailOptions
+{
+    public AuditLogOptions Log { get; init; } = new();
+
+    public IReadOnlySet<string> IgnoredFields { get; init; } = AuditDiff.DefaultIgnored;
+}
 
 /// <summary>
 /// Turns a save, a delete or a switched flag into a trail entry (the one place that knows how): who (<see cref="IAuditActorContext"/>), what changed
