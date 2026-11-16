@@ -1,0 +1,131 @@
+@*
+    ---------------------------------------------------------------------------
+    Copyright © 2026 71 Degrees. All rights reserved.
+    ---------------------------------------------------------------------------
+*@
+@using Microsoft.Extensions.Logging
+@using WebCore.LiveSettings
+@inject ILiveSettings Settings
+@inject ILogger<LiveSettingsPage> Logger
+
+<style>@((MarkupString)Styles)</style>
+
+<div class="wc-live" data-testid="live-settings">
+    <p class="wc-live-intro">@Intro</p>
+
+    @if (_views is null)
+    {
+        <p>Loading...</p>
+    }
+    else if (_views.Count == 0)
+    {
+        <p class="wc-live-empty">No live settings are registered.</p>
+    }
+    else
+    {
+        @foreach (var group in _views.GroupBy(v => v.Definition.Group))
+        {
+            <section class="wc-live-group">
+                <h2>@group.Key</h2>
+                @foreach (var view in group)
+                {
+                    var key = view.Definition.Key;
+                    <div class="wc-live-row" data-testid="@("setting-" + key)">
+                        <div class="wc-live-name"><code>@key</code></div>
+                        <div class="wc-live-help">@view.Definition.Description <span class="wc-live-range">@RangeLine(view.Definition)</span></div>
+                        <div class="wc-live-edit">
+                            @if (view.Definition.Kind == LiveSettingKind.Toggle)
+                            {
+                                <select aria-label="@key" data-testid="@("input-" + key)" value="@DraftOf(view)" @onchange="@(e => SetDraft(key, e.Value?.ToString()))">
+                                    <option value="true">on</option>
+                                    <option value="false">off</option>
+                                </select>
+                            }
+                            else
+                            {
+                                <input aria-label="@key" data-testid="@("input-" + key)" value="@DraftOf(view)" @oninput="@(e => SetDraft(key, e.Value?.ToString()))" />
+                            }
+                            <button type="button" data-testid="@("save-" + key)" @onclick="@(() => SaveAsync(view))">Save</button>
+                            @if (view.Override is not null)
+                            {
+                                <button type="button" data-testid="@("reset-" + key)" @onclick="@(() => ResetAsync(view))">Reset to default</button>
+                            }
+                        </div>
+                        <div class="wc-live-meta">
+                            Default: <code>@Shown(view.Definition.DefaultText)</code>.
+                            @if (view.Override is { } entry)
+                            {
+                                <span>Changed by @entry.ChangedBy on @entry.ChangedAt.ToString("yyyy-MM-dd HH:mm") UTC.</span>
+                            }
+                            else
+                            {
+                                <span>Using the default.</span>
+                            }
+                        </div>
+                        @if (_messages.TryGetValue(key, out var message))
+                        {
+                            <div class="@(message.Ok ? "wc-live-ok" : "wc-live-bad")" role="status" data-testid="@("message-" + key)">@message.Text</div>
+                        }
+                    </div>
+                }
+            </section>
+        }
+    }
+</div>
+
+@code {
+    private const string Styles = """
+        .wc-live{max-width:56rem}
+        .wc-live-row{border:1px solid #8884;border-radius:6px;padding:.6rem .8rem;margin:.5rem 0}
+        .wc-live-help,.wc-live-meta{font-size:.9rem;opacity:.8;margin:.2rem 0}
+        .wc-live-edit{display:flex;gap:.5rem;flex-wrap:wrap;margin:.3rem 0}
+        .wc-live-edit input,.wc-live-edit select{min-width:14rem;padding:.3rem}
+        .wc-live-ok{color:#1a7f37}.wc-live-bad{color:#c62828}
+        """;
+
+    private readonly Dictionary<string, string> _drafts = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (bool Ok, string Text)> _messages = new(StringComparer.Ordinal);
+    private IReadOnlyList<LiveSettingView>? _views;
+
+    /// <summary>Who is recorded as having made a change (the signed-in admin's name, passed by the page that hosts this).</summary>
+    [Parameter]
+    public string ChangedBy { get; set; } = "admin";
+
+    [Parameter]
+    public string Intro { get; set; } = "Values saved here take effect within about half a minute on every server, with no restart. Leave a setting alone to keep its default.";
+
+    protected override async Task OnInitializedAsync() => _views = await Settings.ListAsync();
+
+    private static string Shown(string text) => text.Length == 0 ? "(empty)" : text;
+
+    private static string RangeLine(LiveSettingDefinition definition) => definition.RangeText.Length == 0 ? string.Empty : "(" + definition.RangeText + ")";
+
+    private string DraftOf(LiveSettingView view) => _drafts.TryGetValue(view.Definition.Key, out var draft) ? draft : view.EffectiveText;
+
+    private void SetDraft(string key, string? value) => _drafts[key] = value ?? string.Empty;
+
+    private Task SaveAsync(LiveSettingView view) => ChangeAsync(view, () => Settings.SetAsync(view.Definition.Key, DraftOf(view), ChangedBy), "Saved.");
+
+    private Task ResetAsync(LiveSettingView view) => ChangeAsync(view, () => Settings.ResetAsync(view.Definition.Key, ChangedBy), "Back to the default.");
+
+    // The top of this page's code path: a store failure is shown to the admin and logged, never swallowed.
+    private async Task ChangeAsync(LiveSettingView view, Func<Task<LiveSettingResult>> change, string okText)
+    {
+        var key = view.Definition.Key;
+        try
+        {
+            var result = await change();
+            _messages[key] = (result.Saved, result.Saved ? okText : (result.Reason ?? "Refused."));
+            if (result.Saved)
+            {
+                _drafts.Remove(key);
+                _views = await Settings.ListAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Live setting {Key} could not be changed", key);
+            _messages[key] = (false, "Could not reach the settings store: " + ex.Message);
+        }
+    }
+}

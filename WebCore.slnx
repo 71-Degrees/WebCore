@@ -9,5 +9,6 @@
     <Project Path="tests/WebCore.Tests/WebCore.Tests.csproj" />
     <Project Path="tests/WebCore.Hosting.Tests/WebCore.Hosting.Tests.csproj" />
     <Project Path="tests/WebCore.Deploy.Tests/WebCore.Deploy.Tests.csproj" />
+    <Project Path="tests/WebCore.UI.Tests/WebCore.UI.Tests.csproj" />
   </Folder>
 </Solution>
