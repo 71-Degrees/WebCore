@@ -100,12 +100,12 @@ public static class AccountEndpoints
         var rawEmail = form["email"].ToString().Trim();
         var password = form["password"].ToString();
         var returnUrl = LocalReturnUrl.Sanitize(form["returnUrl"].ToString());
-        var back = $"{bundle.Options.LoginPath}?returnUrl={Uri.EscapeDataString(returnUrl)}&email={Uri.EscapeDataString(rawEmail)}";
+        IResult Refuse(string error) => Results.Redirect($"{bundle.Options.LoginPath}?error={error}&returnUrl={Uri.EscapeDataString(returnUrl)}&email={Uri.EscapeDataString(rawEmail)}");
 
         if (!limits.TryAcquire(http))
         {
             SignInDiagnostics.Refused(log, "rate limited", rawEmail);
-            return Results.Redirect(back + "&error=ratelimited");
+            return Refuse("ratelimited");
         }
 
         var email = AccountEmailService.NormalizeEmail(rawEmail);
@@ -117,20 +117,20 @@ public static class AccountEndpoints
         {
             PasswordHasher.SpendVerifyTime(password);
             SignInDiagnostics.Refused(log, user is null ? "no such account" : "account has no password", rawEmail);
-            return Results.Redirect(back + "&error=1");
+            return Refuse("1");
         }
 
         if (!PasswordHasher.Verify(password, user.PasswordHash))
         {
             SignInDiagnostics.Refused(log, "wrong password", rawEmail);
-            return Results.Redirect(back + "&error=1");
+            return Refuse("1");
         }
 
         // Only reachable with the right password, so naming the real reason leaks nothing.
         if ((await profiles.GetAsync(user.Id)) is { IsDisabled: true })
         {
             SignInDiagnostics.Refused(log, "account disabled", rawEmail);
-            return Results.Redirect(back + "&error=disabled");
+            return Refuse("disabled");
         }
 
         await bundle.Passwords.UpgradeHashIfNeededAsync(user, password);
