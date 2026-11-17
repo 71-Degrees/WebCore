@@ -58,13 +58,13 @@ public static class AccountRegistration
         services.AddSingleton(sp => new AccountEmailService(
             sp.GetRequiredService<IUserRepository>(),
             sp.GetRequiredService<IUserProfileRepository>(),
-            sp.GetRequiredService<IEmailSender>(),
+            MailSender(sp, options),
             options.Roles!,
             emailOptions,
             onSendFailure: ex => Log(sp, options).LogWarning(ex, "Could not send a code email")));
         services.AddSingleton(sp => new PasswordService(
             sp.GetRequiredService<IUserRepository>(),
-            sp.GetRequiredService<IEmailSender>(),
+            MailSender(sp, options),
             emailOptions,
             sp.GetService<TimeProvider>(),
             ex => Log(sp, options).LogWarning(ex, "A password side effect failed: a changed-password notice was not sent, or a password hash was not upgraded")));
@@ -139,6 +139,10 @@ public static class AccountRegistration
                 cookie.Events.OnValidatePrincipal = context => context.HttpContext.RequestServices.GetRequiredService<AccountSessionEvents>().ValidateAsync(context);
             });
     }
+
+    // The app may put its own wrapper around the registered sender for account mail (Better Trivia adds its unsubscribe footer); the default is the sender as registered.
+    private static IEmailSender MailSender(IServiceProvider services, AccountOptions options) =>
+        options.AccountMailSender?.Invoke(services) ?? services.GetRequiredService<IEmailSender>();
 
     private static ILogger Log(IServiceProvider services, AccountOptions options) =>
         services.GetRequiredService<ILoggerFactory>().CreateLogger(options.LogCategory);

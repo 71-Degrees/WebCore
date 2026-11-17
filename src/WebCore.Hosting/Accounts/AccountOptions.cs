@@ -81,6 +81,10 @@ public sealed class AccountOptions
     /// Null, the default, records nothing (see <see cref="AccountEmailOptions.OnConfirmationRequested"/>).</summary>
     public Action<User, EmailRequestStatus>? OnConfirmationRequested { get; set; }
 
+    /// <summary>Builds the sender used for sign-in codes and password notices, when the app wraps its registered <see cref="Email.IEmailSender"/> for account
+    /// mail (a footer, a mail kind). Null, the default, uses the registered sender as it is.</summary>
+    public Func<IServiceProvider, Email.IEmailSender>? AccountMailSender { get; set; }
+
     /// <summary>The shared ceiling on registrations and password attempts per 10 minutes, across every address. The per-address and per-account limits are
     /// the real protection; this is a backstop against a mass attack. Default 60 (what every app had before the module). An app with a real audience may
     /// raise it so a few noisy clients cannot lock everyone out.</summary>
