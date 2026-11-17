@@ -20,12 +20,14 @@ The limits: method 60 lines, 15 decision points, nesting 4, 7 parameters, file 7
 - **A `switch` or an `if/else if` chain on a type or kind becomes a lookup table or a small class per case.**
 - **Endpoint registration is not a place for logic:** `MapX("/path", HandlerMethod)` with a named static method; never an inline lambda over about 10 lines. This is how `MapAccountEndpoints` reached 290 lines.
 - **Razor `@code` over about 100 lines moves to a service or a `.razor.cs` code-behind class.**
+- **A service-registration method (`AddCatalog`, `AddX`) is a list of calls, one `AddY()` per concern, each under 60 lines.** A new feature adds its own `AddFeature()` and one call to it; it never grows the list's method past the limit.
 
 ## Errors (`EmptyCatch`, `BroadCatch`)
 
 - **Exceptions are exceptional.** Do not catch below the top of the code path unless you translate, recover or clean up.
 - **Never an empty `catch`.** At minimum a log line that says what failed and why carrying on is safe.
 - **Catch only what you expect** (`catch (HttpRequestException)`), never bare `Exception`, except at the top of a path where it is logged.
+- **No `_ = SomethingAsync();` (`DroppedTask`).** A started task is awaited, handed to a hosted worker, or logs its own failure; a dropped one fails unseen.
 
 ## Text and encoding (`NonAsciiLiteral`)
 
@@ -35,6 +37,12 @@ The limits: method 60 lines, 15 decision points, nesting 4, 7 parameters, file 7
 ## Duplication (`DuplicateCode`)
 
 - **The second copy is the signal.** When you are about to paste a block, extract it first and call it twice. For async enumeration use `ToListAsync`/`await foreach` helpers that already exist before writing a loop.
+- **Look for the existing piece before you write plumbing.** Parallel helpers each invented their own copy of the same four shapes (2026-11-17, 39 findings, nearly all `DuplicateCode`); reuse or extract a shared base in the same change:
+  - a hosted background worker with a bounded, persisted, de-duplicated pending list (one `PersistedWorkQueue`-style base, not a queue per feature);
+  - a JSON document store over the keyed-document store (get one, save one, list by prefix: one helper, not a copy per store);
+  - a `Meter` plus an in-memory rolling summary (one helper; each metric class only names its counters);
+  - two endpoints that return the same fragment or file (one private method both call).
+- **The tool flags 8 or more repeated lines.** Anything over about 10 lines that exists twice is extracted before the third use.
 
 ## Files (`LongFile` 700)
 
