@@ -81,15 +81,16 @@ internal static class PasswordEndpoints
             return Results.Redirect(options.AccountPath + "?passwordError=masquerade");
         }
 
-        if (!limits.TryAcquire(http))
-        {
-            return Results.Redirect(options.AccountPath + "?passwordError=ratelimited");
-        }
-
         var user = await users.GetByIdAsync(AccountClaims.UserIdOf(http.User) ?? string.Empty);
         if (user is null)
         {
             return Results.Redirect(options.LoginPath);
+        }
+
+        // A guess at the current password counts against the account, as a sign-in does.
+        if (!limits.TryAcquirePassword(http, user.Email))
+        {
+            return Results.Redirect(options.AccountPath + "?passwordError=ratelimited");
         }
 
         var result = string.IsNullOrEmpty(user.PasswordHash)

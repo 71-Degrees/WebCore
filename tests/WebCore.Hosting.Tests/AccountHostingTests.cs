@@ -204,6 +204,21 @@ public sealed class AccountHostingTests : IDisposable
     }
 
     [Fact]
+    public void PasswordGuessesAtOneAccount_AreCapped_FromAnyAddress()
+    {
+        var limits = new AccountRateLimits();
+        static HttpContext From(int n) => new DefaultHttpContext { Connection = { RemoteIpAddress = System.Net.IPAddress.Parse("10.0.0." + n) } };
+
+        for (var i = 1; i <= 10; i++)
+        {
+            Assert.True(limits.TryAcquirePassword(From(i), "sam@example.com"));
+        }
+
+        Assert.False(limits.TryAcquirePassword(From(11), " Sam@Example.com "));
+        Assert.True(limits.TryAcquirePassword(From(11), "other@example.com"));
+    }
+
+    [Fact]
     public void TheEmailFingerprint_IsShortAndIgnoresCaseAndSpace() =>
         Assert.Equal(SignInDiagnostics.EmailFingerprint(" Sam@Example.com "), SignInDiagnostics.EmailFingerprint("sam@example.com"));
 }

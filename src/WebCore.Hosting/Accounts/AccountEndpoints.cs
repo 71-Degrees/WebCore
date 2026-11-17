@@ -109,7 +109,7 @@ public static class AccountEndpoints
         var returnUrl = LocalReturnUrl.Sanitize(form["returnUrl"].ToString());
         IResult Refuse(string error) => Results.Redirect($"{bundle.Options.LoginPath}?error={error}&returnUrl={Uri.EscapeDataString(returnUrl)}{bundle.FormMemory.QueryPart(http, rawEmail)}");
 
-        if (!limits.TryAcquire(http))
+        if (!limits.TryAcquirePassword(http, rawEmail))
         {
             SignInDiagnostics.Refused(log, "rate limited", rawEmail);
             return Refuse("ratelimited");

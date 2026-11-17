@@ -46,29 +46,26 @@ public sealed class AccountSignIn(IUserProfileRepository profiles, AccountClaims
 }
 
 /// <summary>
-/// Limits on password sign-in, registration and password changes: per caller (IP address) AND a global ceiling, so neither one script nor a crowd of them
-/// can grind through passwords. Emailed codes have their own, stricter limits inside <see cref="AccountEmailService"/>.
+/// Limits on registration, password sign-in, password changes and resets, backed by <see cref="AccountAttemptLimiter"/>: 10 per 10 minutes from one address,
+/// and for a password, 10 per 15 minutes against one account from anywhere (so a password cannot be guessed at speed from many addresses), then a shared
+/// ceiling. The narrow limits are checked first, so one noisy client spends its own allowance and not everyone's. Emailed codes have their own, stricter
+/// limits inside <see cref="AccountEmailService"/>.
 /// </summary>
 public sealed class AccountRateLimits
 {
-    private const int MaxTrackedCallers = 5000;
-    private static readonly TimeSpan Window = TimeSpan.FromMinutes(10);
+    // The shared ceiling every app had before the module (60 per 10 minutes); the per-address and per-account limits are the real protection.
+    private const int SharedCeiling = 60;
 
-    private readonly SlidingWindowRateLimiter _global = new(maxInWindow: 60, Window);
-    private readonly ConcurrentDictionary<string, SlidingWindowRateLimiter> _perCaller = new();
+    private readonly AccountAttemptLimiter _limits = new(globalMax: SharedCeiling);
 
-    /// <summary>True when this attempt may go ahead. The global counter is only spent once the caller's own limit allows it.</summary>
-    public bool TryAcquire(HttpContext http)
-    {
-        if (_perCaller.Count > MaxTrackedCallers)
-        {
-            _perCaller.Clear();
-        }
+    /// <summary>An attempt that names no existing password (a registration, a reset by emailed code): this address's allowance, then the shared ceiling.</summary>
+    public bool TryAcquire(HttpContext http) => _limits.TryAcquire(Address(http));
 
-        var caller = http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        return _perCaller.GetOrAdd(caller, _ => new SlidingWindowRateLimiter(maxInWindow: 10, Window)).TryAcquire()
-            && _global.TryAcquire();
-    }
+    /// <summary>An attempt at <paramref name="email"/>'s password (a sign-in, a password change): that account's allowance, then this address's, then the shared ceiling.</summary>
+    public bool TryAcquirePassword(HttpContext http, string email) => _limits.TryAcquireLogin(Address(http), email);
+
+    // Requests with no address (an in-memory test host) share one allowance.
+    private static string Address(HttpContext http) => http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 }
 
 /// <summary>

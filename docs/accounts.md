@@ -71,6 +71,12 @@ an app back past its switch to WebCore accounts needs the role names written bac
 
 `AccountMessages.ForCodeError` and `ForPasswordError` turn the status codes into words for the pages.
 
+## Attempt limits
+
+`AccountRateLimits` (on `AccountAttemptLimiter`): registrations and resets get 10 per 10 minutes from one address; a password sign-in or a password change
+also counts against the account, 10 per 15 minutes from any address, so a password cannot be guessed at speed from many addresses; then a shared ceiling
+of 60 per 10 minutes. Emailed codes have their own limits inside `AccountEmailService` (5 per address per hour, 10 per browser, 60 an hour and 200 a day).
+
 ## Sessions
 
 `AccountSessionEvents` runs on every request with the cookie (`Judge` is the pure decision, tested on its own): no profile, a disabled one, or a security
