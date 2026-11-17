@@ -33,6 +33,10 @@ public sealed class LiveSettingsService : ILiveSettings, IDisposable
     private long _nextRefreshTicks;
     private int _refreshing;
 
+    /// <summary>The background refresh <see cref="Peek{T}"/> last started, held rather than discarded so it is observed (it never faults: the read inside
+    /// swallows store failures), and a test can await it.</summary>
+    internal Task BackgroundRefresh { get; private set; } = Task.CompletedTask;
+
     public LiveSettingsService(IKeyedDocumentStore store, IEnumerable<LiveSettingDefinition> definitions, LiveSettingsOptions options, TimeProvider? timeProvider = null)
     {
         _store = store;
@@ -56,7 +60,7 @@ public sealed class LiveSettingsService : ILiveSettings, IDisposable
         if (now.UtcTicks >= Volatile.Read(ref _nextRefreshTicks) && Interlocked.CompareExchange(ref _refreshing, 1, 0) == 0)
         {
             Volatile.Write(ref _nextRefreshTicks, (now + _options.CacheTimeToLive).UtcTicks);
-            _ = RefreshInBackgroundAsync();
+            BackgroundRefresh = RefreshInBackgroundAsync();
         }
 
         return ValueFrom(definition, Volatile.Read(ref _lastKnown));

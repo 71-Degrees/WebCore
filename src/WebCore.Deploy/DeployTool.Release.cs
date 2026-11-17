@@ -134,12 +134,12 @@ internal static partial class DeployTool
     // Opt-in (--offline-page) because the gain is modest and uneven. Measured on staging: a plain zip deploy gave visitors ~4 raw 503s/hangs over
     // ~18s; with the page, one run showed the friendly page for ~10s then one slow request, another only ~1s of it before the same restart blip.
     // The restart after the files land is what still shows raw errors, and only a slot swap removes that.
-    private static string WithOfflinePage(string zip, (string Name, Target Target, Options Options) t)
+    private static async Task<string> WithOfflinePageAsync(string zip, (string Name, Target Target, Options Options) t)
     {
         var copy = Path.Combine(StateDir(), "deploying.zip");
         File.Copy(zip, copy, overwrite: true);
         using var archive = ZipFile.Open(copy, ZipArchiveMode.Update);
-        var written = PageFromNoticeAsync(archive, t).GetAwaiter().GetResult();
+        var written = await PageFromNoticeAsync(archive, t);
         using var entry = archive.CreateEntry("app_offline.htm").Open();
         if (written is not null)
         {
@@ -223,7 +223,7 @@ internal static partial class DeployTool
 
     private static async Task<int> PushCoreAsync((string Name, Target Target, Options Options) t, DeployState state, string zip, string version, bool isRollback)
     {
-        if (Upload(t, zip, version) is { } failed)
+        if (await UploadAsync(t, zip, version) is { } failed)
         {
             return failed;
         }
@@ -264,10 +264,10 @@ internal static partial class DeployTool
     internal static bool ShouldRestoreAfterDeadBuild(string target, bool isRollback, bool previousBuildOnDisk) => !isRollback && target == "stage" && previousBuildOnDisk;
 
     /// <summary>Uploads the build to Azure. Returns null when it went up, otherwise the exit code: 4 when the upload failed, 6 when the "being updated" page could not be taken down afterwards.</summary>
-    private static int? Upload((string Name, Target Target, Options Options) t, string zip, string version)
+    private static async Task<int?> UploadAsync((string Name, Target Target, Options Options) t, string zip, string version)
     {
         var useOfflinePage = t.Options.Flag("--offline-page");
-        var toUpload = useOfflinePage ? WithOfflinePage(zip, t) : zip;
+        var toUpload = useOfflinePage ? await WithOfflinePageAsync(zip, t) : zip;
         Console.WriteLine($"Deploying {version} to {t.Target.App}{(useOfflinePage ? " (visitors see the 'being updated' page meanwhile)" : string.Empty)}...");
         var (code, output) = Run("cmd", $"/c az webapp deploy --name {t.Target.App} --resource-group {t.Target.Group} --src-path \"{toUpload}\" --type zip");
         if (useOfflinePage)

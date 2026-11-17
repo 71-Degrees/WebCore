@@ -117,7 +117,7 @@ internal static partial class DeployTool
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"  (the background checks could not be started: {ex.Message})");
+            Console.Error.WriteLine($"  (the background checks could not be started: {ex.Message})");
         }
     }
 
@@ -137,19 +137,9 @@ internal static partial class DeployTool
 
         var stages = new List<Task<bool>>();
         var touched = GateSkip.ChangedPaths(root);   // null: not known, so every stage runs
-        if (Config.TestsOneAtATime)
+        if (!StartTestStages(root, projects, timings, stages))
         {
-            // All() stops at the first failing project, as the builds above do.
-            if (!projects.All(project => RunTestProjectLogged(root, project, timings.Begin("tests: " + Path.GetFileName(project)))))
-            {
-                return false;
-            }
-        }
-        else
-        {
-            stages.AddRange(projects.Select(project => (Project: project, Log: timings.Begin("tests: " + Path.GetFileName(project))))
-                .ToList()
-                .Select(p => Task.Run(() => RunTestProjectLogged(root, p.Project, p.Log))));
+            return false;
         }
 
         if (changedOnly && Config.ChangedTests is { } changedTests)
@@ -183,6 +173,21 @@ internal static partial class DeployTool
         }
 
         return passed;
+    }
+
+    /// <summary>The test projects' runs: one after another when the settings say so (false at the first failure, as the builds do), otherwise started
+    /// alongside the other stages.</summary>
+    private static bool StartTestStages(string root, IReadOnlyList<string> projects, CheckTimings timings, List<Task<bool>> stages)
+    {
+        if (Config.TestsOneAtATime)
+        {
+            return projects.All(project => RunTestProjectLogged(root, project, timings.Begin("tests: " + Path.GetFileName(project))));
+        }
+
+        stages.AddRange(projects.Select(project => (Project: project, Log: timings.Begin("tests: " + Path.GetFileName(project))))
+            .ToList()
+            .Select(p => Task.Run(() => RunTestProjectLogged(root, p.Project, p.Log))));
+        return true;
     }
 
     private static bool RunChangedTests(string root, string command, StageLog log)

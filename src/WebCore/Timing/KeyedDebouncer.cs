@@ -24,6 +24,10 @@ public sealed class KeyedDebouncer<TKey> : IDisposable
     private readonly object _gate = new();
     private bool _disposed;
 
+    /// <summary>The run the most recent <see cref="Trigger"/> started. Held rather than discarded so it is observed; it never faults (every failure goes to
+    /// <c>onError</c>), and a test can await it.</summary>
+    internal Task LastRun { get; private set; } = Task.CompletedTask;
+
     public KeyedDebouncer(TimeSpan delay, Action<Exception> onError, TimeProvider? time = null, IEqualityComparer<TKey>? comparer = null)
     {
         ArgumentNullException.ThrowIfNull(onError);
@@ -52,7 +56,7 @@ public sealed class KeyedDebouncer<TKey> : IDisposable
         }
 
         superseded?.Cancel();
-        _ = RunAsync(key, current, action);
+        LastRun = RunAsync(key, current, action);
     }
 
     /// <summary>Stops whatever is waiting or running for the key. Nothing happens when there is nothing.</summary>
@@ -112,13 +116,16 @@ public sealed class KeyedDebouncer<TKey> : IDisposable
         }
         catch (Exception ex)
         {
-            _onError(ex);
+            LogFailure(ex);
         }
         finally
         {
             Forget(key, source);
         }
     }
+
+    // The caller's onError is where a failed action is logged (this library has no logger of its own).
+    private void LogFailure(Exception ex) => _onError(ex);
 
     private void Forget(TKey key, CancellationTokenSource source)
     {

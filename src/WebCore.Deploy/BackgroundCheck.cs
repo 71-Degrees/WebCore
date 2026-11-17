@@ -203,9 +203,15 @@ internal static partial class BackgroundCheck
                 old.Kill(entireProcessTree: true);
                 old.WaitForExit(10000);
             }
-            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+            catch (ArgumentException)
             {
-                // It had already finished: nothing to stop.
+                // The usual case: no process has that id any more, so the previous run had finished and there is nothing to stop.
+                return;
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+            {
+                // It ended while being stopped, or cannot be touched: either way this run goes ahead, and the reason is said.
+                Console.Error.WriteLine($"  (the previous background run {pid} could not be stopped: {ex.Message})");
             }
         }
     }

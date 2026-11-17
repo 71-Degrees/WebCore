@@ -77,25 +77,7 @@ internal static class OfflinePage
 
         if (content.ShowReleaseNotes && content.Release is { Commits.Count: > 0 } release)
         {
-            html.Append("<details><summary>See what's new in this update</summary><div class=\"notes\">");
-            foreach (var category in Enum.GetValues<ChangeCategory>())
-            {
-                var group = release.Commits.Where(c => c.Category == category).ToList();
-                if (group.Count == 0)
-                {
-                    continue;
-                }
-
-                html.Append($"<h4>{Encode(CommitClassifier.Heading(category))}</h4><ul>");
-                foreach (var commit in group)
-                {
-                    html.Append($"<li>{Encode(commit.Subject)}</li>");
-                }
-
-                html.Append("</ul>");
-            }
-
-            html.Append("</div></details>");
+            AppendReleaseNotes(html, release);
         }
 
         // Padding so browsers show this page instead of their own generic error page for a 503 (some need more than 512 bytes), then the check that reloads it once the site answers.
@@ -108,6 +90,30 @@ internal static class OfflinePage
             </body></html>
             """);
         return html.ToString();
+    }
+
+    // The newest release's commits, grouped under the release-notes headings, folded away until the visitor opens them.
+    private static void AppendReleaseNotes(StringBuilder html, Release release)
+    {
+        html.Append("<details><summary>See what's new in this update</summary><div class=\"notes\">");
+        foreach (var category in Enum.GetValues<ChangeCategory>())
+        {
+            var group = release.Commits.Where(c => c.Category == category).ToList();
+            if (group.Count == 0)
+            {
+                continue;
+            }
+
+            html.Append($"<h4>{Encode(CommitClassifier.Heading(category))}</h4><ul>");
+            foreach (var commit in group)
+            {
+                html.Append($"<li>{Encode(commit.Subject)}</li>");
+            }
+
+            html.Append("</ul>");
+        }
+
+        html.Append("</div></details>");
     }
 
     private static string Encode(string text) => WebUtility.HtmlEncode(text);
