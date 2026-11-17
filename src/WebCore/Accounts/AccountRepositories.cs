@@ -41,3 +41,55 @@ public interface IUserProfileRepository
 
     Task<IReadOnlyList<UserProfile>> ListAllAsync(CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// The same profiles as the app's own profile class (<typeparamref name="TProfile"/>, deriving from <see cref="UserProfile"/>), for an app that keeps
+/// fields of its own on the profile (a team name, an avatar, a setting that defaults to on). WebCore itself reads and writes them through
+/// <see cref="IUserProfileRepository"/>; the same repository answers both, so the app's fields survive every WebCore save.
+/// </summary>
+public interface IUserProfileRepository<TProfile>
+    where TProfile : UserProfile
+{
+    Task<TProfile?> GetAsync(string userId, CancellationToken cancellationToken = default);
+
+    Task<TProfile> EnsureProfileAsync(string userId, string displayName, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TProfile>> ListAllAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Admin action, as <see cref="IUserProfileRepository.SetRoleAsync"/>.</summary>
+    Task SetRoleAsync(string userId, string role, CancellationToken cancellationToken = default);
+
+    /// <summary>Admin action, as <see cref="IUserProfileRepository.SetDisabledAsync"/>.</summary>
+    Task SetDisabledAsync(string userId, bool disabled, CancellationToken cancellationToken = default);
+
+    /// <summary>Loads the profile, applies <paramref name="change"/> (the app's own fields) and saves it, under that user's lock. A user with no profile is left
+    /// alone. The change must not touch the role or the disabled flag: those have their own admin actions.</summary>
+    Task UpdateAsync(string userId, Action<TProfile> change, CancellationToken cancellationToken = default);
+}
+
+/// <summary>A profile repository for the app's class that answers WebCore's plain <see cref="IUserProfileRepository"/> too: the one place that knows how
+/// the typed answers become plain ones.</summary>
+public abstract class ProfileRepositoryBase<TProfile> : IUserProfileRepository<TProfile>, IUserProfileRepository
+    where TProfile : UserProfile
+{
+    public abstract Task<TProfile?> GetAsync(string userId, CancellationToken cancellationToken = default);
+
+    public abstract Task<TProfile> EnsureProfileAsync(string userId, string displayName, CancellationToken cancellationToken = default);
+
+    public abstract Task<IReadOnlyList<TProfile>> ListAllAsync(CancellationToken cancellationToken = default);
+
+    public abstract Task SetRoleAsync(string userId, string role, CancellationToken cancellationToken = default);
+
+    public abstract Task SetDisabledAsync(string userId, bool disabled, CancellationToken cancellationToken = default);
+
+    public abstract Task UpdateAsync(string userId, Action<TProfile> change, CancellationToken cancellationToken = default);
+
+    async Task<UserProfile?> IUserProfileRepository.GetAsync(string userId, CancellationToken cancellationToken) =>
+        await GetAsync(userId, cancellationToken).ConfigureAwait(false);
+
+    async Task<UserProfile> IUserProfileRepository.EnsureProfileAsync(string userId, string displayName, CancellationToken cancellationToken) =>
+        await EnsureProfileAsync(userId, displayName, cancellationToken).ConfigureAwait(false);
+
+    async Task<IReadOnlyList<UserProfile>> IUserProfileRepository.ListAllAsync(CancellationToken cancellationToken) =>
+        await ListAllAsync(cancellationToken).ConfigureAwait(false);
+}

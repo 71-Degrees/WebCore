@@ -95,13 +95,14 @@ Lookups by email read the store directly (one document). `StorageCalls` wraps bo
 - Keep the app's cookie names, claim prefix, log category and store names in `AccountOptions`.
 - Extras that stay app-side: canary account, email canonicalizing, SendGrid/SMTP senders, the customer email opt-out.
 
-Gaps to close in WebCore before Better Trivia can switch (each small; checked against its code 2026-11-16):
-
-- **Typed profile fields:** Better Trivia's profile has about 12 more (CreatedAt, content terms, nearby digest, `ShowOnLeaderboard` defaulting to true,
-  team name, avatar, AI hosting). `UnknownFields` keeps them, but typed access and a true default want a generic repository
-  (`UserProfileRepository<TProfile> where TProfile : UserProfile`).
-- **A signup hook** (`IAccountSignupPolicy`, no-op by default) for its signup screening and Tor list.
-- **Remembered sign-in:** an `AccountOptions` switch for its persistent cookie.
-- **Emails kept out of URLs:** its `AccountFormMemory`; WebCore's redirects carry `email=` as CrateDigger's did.
 - Its renames: claim prefix `tn:`; `Request/ConfirmPasswordResetCodeAsync` are `Request/ConfirmPasswordResetAsync` here; its own `AccountEmailOptions`
   clashes by name with this one.
+
+## An app's own needs (added 2026-11-17 for Better Trivia; all off or plain by default)
+
+| Need | How | Default |
+|---|---|---|
+| Profile fields of its own (team name, avatar, a setting that defaults to on) | A class deriving from `UserProfile`, registered with `builder.AddWebCoreAccounts<TeamProfile>(...)`. The app reads and changes them through `IUserProfileRepository<TeamProfile>` (`UpdateAsync` for its own fields); WebCore keeps using `IUserProfileRepository`, the same cached repository, so a WebCore save never loses them. A field missing from an old document takes the class's default. | `UserProfile` |
+| Screening signups (bots, a blocked network, an invite code) | Register an `IAccountSignupPolicy` before `AddWebCoreAccounts`. `Refusal` runs after the form checks and before the shared attempt limiter; `AccountCreatedAsync` runs once the account exists (record the signup address, grant a role). Accounts first made by emailed code are not screened. | `AllowAllSignups` |
+| A remembered sign-in | `o.PersistentSignIn = true`: every sign-in (and a masquerade) gets a persistent cookie for `CookieLifetime`. | off: a browser-session cookie |
+| Emails kept out of URLs | `o.KeepEmailsOutOfUrls = true` (and `o.FormEmailCookieName`): every redirect that carried `email=` remembers the address in a sealed ten-minute cookie instead (`AccountFormMemory`); pages read it with `AccountFormMemory.Recall(http)`, and a signed-in browser's cookie is cleared. The code and reset forms fall back to it when their email field is empty. | off: `email=` in the query |

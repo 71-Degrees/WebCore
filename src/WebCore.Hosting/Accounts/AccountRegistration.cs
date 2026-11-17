@@ -26,7 +26,13 @@ public static class AccountPolicies
 /// </summary>
 public static class AccountRegistration
 {
-    public static WebApplicationBuilder AddWebCoreAccounts(this WebApplicationBuilder builder, Action<AccountOptions> configure)
+    public static WebApplicationBuilder AddWebCoreAccounts(this WebApplicationBuilder builder, Action<AccountOptions> configure) =>
+        builder.AddWebCoreAccounts<UserProfile>(configure);
+
+    /// <summary>Accounts whose profiles are the app's own class (fields of its own, real defaults): <see cref="IUserProfileRepository{TProfile}"/> reads
+    /// and updates them, and WebCore's own <see cref="IUserProfileRepository"/> is the same cached repository.</summary>
+    public static WebApplicationBuilder AddWebCoreAccounts<TProfile>(this WebApplicationBuilder builder, Action<AccountOptions> configure)
+        where TProfile : UserProfile, new()
     {
         var options = new AccountOptions();
         configure(options);
@@ -36,7 +42,7 @@ public static class AccountRegistration
         services.AddSingleton(options);
         services.AddSingleton(options.Roles!);
         services.AddSingleton(new AccountClaims(options.ClaimPrefix));
-        AddRepositories(services, options);
+        AddRepositories<TProfile>(services, options);
 
         // Unconfigured email is safely off: a sender that only logs, never a startup crash for a missing secret.
         services.TryAddSingleton<IEmailSender, NullEmailSender>();
@@ -58,6 +64,8 @@ public static class AccountRegistration
 
         services.AddSingleton<AccountRateLimits>();
         services.AddSingleton<AccountSignIn>();
+        services.AddSingleton<AccountFormMemory>();
+        services.TryAddSingleton<IAccountSignupPolicy, AllowAllSignups>();
         services.AddSingleton<AccountServicesBundle>();
         services.AddSingleton(new AccountSessionEvents(options, AdminEmails(builder.Configuration)));
         AddCookie(services, options);
@@ -67,11 +75,14 @@ public static class AccountRegistration
 
     // Both are wrapped in short-lived caches because the cookie check reads a profile and an account on every request; StorageCalls (under the cache)
     // counts what gets through to real storage for the read budgets.
-    private static void AddRepositories(IServiceCollection services, AccountOptions options)
+    private static void AddRepositories<TProfile>(IServiceCollection services, AccountOptions options)
+        where TProfile : UserProfile, new()
     {
         services.AddSingleton<IUserRepository>(_ => new CachedUserRepository(StorageCalls.Wrap<IUserRepository>(new UserRepository(options.UsersStore!))));
-        services.AddSingleton<IUserProfileRepository>(sp => new CachedUserProfileRepository(
-            StorageCalls.Wrap<IUserProfileRepository>(new UserProfileRepository(options.ProfilesStore!, options.Roles!, sp.GetService<TimeProvider>()))));
+        services.AddSingleton(sp => new CachedUserProfileRepository<TProfile>(
+            StorageCalls.Wrap<IUserProfileRepository<TProfile>>(new UserProfileRepository<TProfile>(options.ProfilesStore!, options.Roles!, sp.GetService<TimeProvider>()))));
+        services.AddSingleton<IUserProfileRepository<TProfile>>(sp => sp.GetRequiredService<CachedUserProfileRepository<TProfile>>());
+        services.AddSingleton<IUserProfileRepository>(sp => sp.GetRequiredService<CachedUserProfileRepository<TProfile>>());
     }
 
     // Local development never emails codes by default (a dev machine may hold real secrets, and casual testing must not email anyone): the code shows

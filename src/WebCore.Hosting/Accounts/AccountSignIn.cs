@@ -16,13 +16,19 @@ namespace WebCore.Hosting.Accounts;
 
 /// <summary>Signs a browser in as an account with its current role. Every sign-in path (password, emailed code, masquerade, a dev shortcut) goes through
 /// here, so they all issue the same claims.</summary>
-public sealed class AccountSignIn(IUserProfileRepository profiles, AccountClaims claims, AccountRoles roles)
+public sealed class AccountSignIn(IUserProfileRepository profiles, AccountClaims claims, AccountOptions options, AccountFormMemory formMemory)
 {
     public async Task<ClaimsPrincipal> SignInAsync(HttpContext http, User user)
     {
-        var role = (await profiles.GetAsync(user.Id).ConfigureAwait(false))?.Role ?? roles.Default;
+        var role = (await profiles.GetAsync(user.Id).ConfigureAwait(false))?.Role ?? options.Roles!.Default;
         var principal = claims.CreatePrincipal(user, role, CookieAuthenticationDefaults.AuthenticationScheme);
-        await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal).ConfigureAwait(false);
+        await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, Properties()).ConfigureAwait(false);
+        if (options.KeepEmailsOutOfUrls)
+        {
+            // Signed in: the address typed on the way here is no longer needed.
+            formMemory.Forget(http);
+        }
+
         return principal;
     }
 
@@ -30,7 +36,11 @@ public sealed class AccountSignIn(IUserProfileRepository profiles, AccountClaims
     public Task SignInAsMasqueradeAsync(HttpContext http, User target, string targetRole, string originalAdminUserId) =>
         http.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
-            claims.CreateMasqueradePrincipal(target, targetRole, originalAdminUserId, CookieAuthenticationDefaults.AuthenticationScheme));
+            claims.CreateMasqueradePrincipal(target, targetRole, originalAdminUserId, CookieAuthenticationDefaults.AuthenticationScheme),
+            Properties());
+
+    // A remembered sign-in (AccountOptions.PersistentSignIn) survives closing the browser; otherwise the cookie lasts the browser session.
+    private AuthenticationProperties Properties() => new() { IsPersistent = options.PersistentSignIn };
 
     public static Task SignOutAsync(HttpContext http) => http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
 }

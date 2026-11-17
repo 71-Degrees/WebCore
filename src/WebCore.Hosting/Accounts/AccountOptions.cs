@@ -44,6 +44,18 @@ public sealed class AccountOptions
 
     public TimeSpan CookieLifetime { get; set; } = TimeSpan.FromDays(14);
 
+    /// <summary>True: every sign-in is remembered (a persistent cookie that survives closing the browser, for <see cref="CookieLifetime"/>). False, the
+    /// default: the cookie lasts as long as the browser session.</summary>
+    public bool PersistentSignIn { get; set; }
+
+    /// <summary>True: the address a person typed travels across a redirect in a sealed, ten-minute cookie (<see cref="AccountFormMemory"/>) instead of an
+    /// <c>email=</c> query parameter, so it never lands in request logs or telemetry. The pages read it with <see cref="AccountFormMemory.Recall"/>.
+    /// False, the default: the address is in the query string.</summary>
+    public bool KeepEmailsOutOfUrls { get; set; }
+
+    /// <summary>The cookie <see cref="AccountFormMemory"/> uses.</summary>
+    public string FormEmailCookieName { get; set; } = "webcore_form_email";
+
     public string LoginPath { get; set; } = "/account/login";
 
     public string RegisterPath { get; set; } = "/account/register";

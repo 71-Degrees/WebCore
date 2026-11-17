@@ -53,7 +53,7 @@ public static class AccountEndpoints
 
         IResult Fail(string reason) => Results.Redirect(
             $"{options.RegisterPath}?error={Uri.EscapeDataString(reason)}&returnUrl={Uri.EscapeDataString(returnUrl)}" +
-            $"&email={Uri.EscapeDataString(rawEmail.Trim())}&displayName={Uri.EscapeDataString(displayName)}");
+            $"{bundle.FormMemory.QueryPart(http, rawEmail.Trim())}&displayName={Uri.EscapeDataString(displayName)}");
 
         var email = AccountEmailService.NormalizeEmail(rawEmail);
         if (email is null)
@@ -72,6 +72,12 @@ public static class AccountEndpoints
             return Fail(problem);
         }
 
+        // The app's own screening goes before the shared attempt limiter, so refused bots cannot use up the attempts real people share.
+        if (bundle.SignupPolicy.Refusal(http, email, displayName) is { } refusal)
+        {
+            return Fail(refusal);
+        }
+
         if (!limits.TryAcquire(http))
         {
             return Fail("Too many attempts right now - please try again in a few minutes.");
@@ -88,6 +94,7 @@ public static class AccountEndpoints
         }
 
         bundle.Log.LogInformation("New account registered: {UserId}", user.Id);
+        await bundle.SignupPolicy.AccountCreatedAsync(http, user, form);
         await bundle.SignIn.SignInAsync(http, user);
         return Results.LocalRedirect(returnUrl);
     }
@@ -100,7 +107,7 @@ public static class AccountEndpoints
         var rawEmail = form["email"].ToString().Trim();
         var password = form["password"].ToString();
         var returnUrl = LocalReturnUrl.Sanitize(form["returnUrl"].ToString());
-        IResult Refuse(string error) => Results.Redirect($"{bundle.Options.LoginPath}?error={error}&returnUrl={Uri.EscapeDataString(returnUrl)}&email={Uri.EscapeDataString(rawEmail)}");
+        IResult Refuse(string error) => Results.Redirect($"{bundle.Options.LoginPath}?error={error}&returnUrl={Uri.EscapeDataString(returnUrl)}{bundle.FormMemory.QueryPart(http, rawEmail)}");
 
         if (!limits.TryAcquire(http))
         {
@@ -139,25 +146,28 @@ public static class AccountEndpoints
         return Results.LocalRedirect(returnUrl);
     }
 
-    private static async Task<IResult> SendSignInCodeAsync(HttpContext http, AccountEmailService accountEmail, AccountOptions options)
+    private static async Task<IResult> SendSignInCodeAsync(HttpContext http, AccountEmailService accountEmail, AccountServicesBundle bundle)
     {
+        var options = bundle.Options;
         var form = await http.Request.ReadFormAsync();
         var email = form["email"].ToString().Trim();
         var returnUrl = LocalReturnUrl.Sanitize(form["returnUrl"].ToString());
 
         var result = await accountEmail.RequestSignInCodeAsync(email, CodeClient.KeyFor(http, options));
-        var common = $"&email={Uri.EscapeDataString(email)}&returnUrl={Uri.EscapeDataString(returnUrl)}";
+        var common = $"{bundle.FormMemory.QueryPart(http, email)}&returnUrl={Uri.EscapeDataString(returnUrl)}";
         return result.Status == EmailRequestStatus.Sent
             ? Results.Redirect(options.LoginPath + "?step=code" + common + DevCode(result))
             : Results.Redirect(options.LoginPath + "?codeError=" + Code(result.Status) + common);
     }
 
-    private static async Task<IResult> VerifySignInCodeAsync(HttpContext http, AccountEmailService accountEmail, IUserProfileRepository profiles, AccountSignIn signIn, AccountOptions options)
+    private static async Task<IResult> VerifySignInCodeAsync(HttpContext http, AccountEmailService accountEmail, IUserProfileRepository profiles, AccountServicesBundle bundle)
     {
+        var options = bundle.Options;
+        var signIn = bundle.SignIn;
         var form = await http.Request.ReadFormAsync();
-        var email = form["email"].ToString().Trim();
+        var email = (form["email"].ToString() is { Length: > 0 } typed ? typed : bundle.FormMemory.Recall(http) ?? string.Empty).Trim();
         var returnUrl = LocalReturnUrl.Sanitize(form["returnUrl"].ToString());
-        var common = $"&email={Uri.EscapeDataString(email)}&returnUrl={Uri.EscapeDataString(returnUrl)}";
+        var common = $"{bundle.FormMemory.QueryPart(http, email)}&returnUrl={Uri.EscapeDataString(returnUrl)}";
 
         var clientKey = http.Request.Cookies[options.CodeClientCookieName];
         if (string.IsNullOrWhiteSpace(clientKey))
@@ -184,12 +194,13 @@ public static class AccountEndpoints
         }
     }
 
-    private static async Task<IResult> SendEmailCodeAsync(HttpContext http, AccountEmailService accountEmail, AccountOptions options)
+    private static async Task<IResult> SendEmailCodeAsync(HttpContext http, AccountEmailService accountEmail, AccountServicesBundle bundle)
     {
+        var options = bundle.Options;
         var form = await http.Request.ReadFormAsync();
         var email = form["email"].ToString().Trim();
         var result = await accountEmail.RequestEmailConfirmationAsync(AccountClaims.UserIdOf(http.User), email);
-        var common = "&email=" + Uri.EscapeDataString(email);
+        var common = bundle.FormMemory.QueryPart(http, email);
         return result.Status == EmailRequestStatus.Sent
             ? Results.Redirect(options.AccountPath + "?step=code" + common + DevCode(result))
             : Results.Redirect(options.AccountPath + "?emailError=" + Code(result.Status) + common);
@@ -197,10 +208,12 @@ public static class AccountEndpoints
 
     // Confirming re-issues the cookie, so the email-confirmed claim (and a changed address) apply at once, and a configured admin email is promoted by
     // the sign-in check the moment it is proven.
-    private static async Task<IResult> VerifyEmailCodeAsync(HttpContext http, AccountEmailService accountEmail, AccountSignIn signIn, AccountOptions options)
+    private static async Task<IResult> VerifyEmailCodeAsync(HttpContext http, AccountEmailService accountEmail, AccountServicesBundle bundle)
     {
+        var options = bundle.Options;
+        var signIn = bundle.SignIn;
         var form = await http.Request.ReadFormAsync();
-        var common = "&email=" + Uri.EscapeDataString(form["email"].ToString().Trim());
+        var common = bundle.FormMemory.QueryPart(http, form["email"].ToString().Trim());
         var result = await accountEmail.ConfirmEmailAsync(AccountClaims.UserIdOf(http.User), form["code"].ToString());
         if (result.Status != CodeCheckStatus.Confirmed)
         {
@@ -242,13 +255,18 @@ public static class AccountEndpoints
 }
 
 /// <summary>The services several account handlers share, so a handler's parameter list stays short (one request-scoped bundle, not six injections).</summary>
-public sealed class AccountServicesBundle(AccountOptions options, AccountSignIn signIn, PasswordService passwords, ILoggerFactory loggers)
+public sealed class AccountServicesBundle(
+    AccountOptions options, AccountSignIn signIn, PasswordService passwords, AccountFormMemory formMemory, IAccountSignupPolicy signupPolicy, ILoggerFactory loggers)
 {
     public AccountOptions Options { get; } = options;
 
     public AccountSignIn SignIn { get; } = signIn;
 
     public PasswordService Passwords { get; } = passwords;
+
+    public AccountFormMemory FormMemory { get; } = formMemory;
+
+    public IAccountSignupPolicy SignupPolicy { get; } = signupPolicy;
 
     public ILogger Log { get; } = loggers.CreateLogger(options.LogCategory);
 }

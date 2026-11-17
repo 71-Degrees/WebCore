@@ -28,7 +28,8 @@ public static class StorageCalls
         var proxy = DispatchProxy.Create<T, CountingProxy<T>>();
         var counting = (CountingProxy<T>)(object)proxy;
         counting.Inner = inner;
-        counting.Repository = typeof(T).Name;
+        // A generic interface (IUserProfileRepository`1) is counted under its plain name, so an app's own profile class does not rename the counter.
+        counting.Repository = typeof(T).Name.Split('`')[0];
         return proxy;
     }
 

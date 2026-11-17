@@ -95,26 +95,60 @@ public class CachedUserRepository : IUserRepository, IDisposable
 /// account takes effect at once on the server that did it; another server notices within the time-to-live. Callers always get
 /// their own copy, never the shared one.
 /// </summary>
-public class CachedUserProfileRepository : IUserProfileRepository, IDisposable
+public class CachedUserProfileRepository(IUserProfileRepository<UserProfile> inner, TimeSpan? ttl = null, Func<DateTimeOffset>? now = null)
+    : CachedUserProfileRepository<UserProfile>(inner, ttl, now)
 {
-    private readonly IUserProfileRepository _inner;
-    private readonly KeyedCache<string, UserProfile> _byUser;
-    private readonly SnapshotCache<IReadOnlyList<UserProfile>> _all;
-
+    /// <summary>Wraps a plain repository (a test double, or a counting proxy) that only speaks <see cref="IUserProfileRepository"/>.</summary>
     public CachedUserProfileRepository(IUserProfileRepository inner, TimeSpan? ttl = null, Func<DateTimeOffset>? now = null)
+        : this(new PlainProfiles(inner), ttl, now)
+    {
+    }
+
+    private sealed class PlainProfiles(IUserProfileRepository inner) : IUserProfileRepository<UserProfile>
+    {
+        public Task<UserProfile?> GetAsync(string userId, CancellationToken cancellationToken = default) => inner.GetAsync(userId, cancellationToken);
+
+        public Task<UserProfile> EnsureProfileAsync(string userId, string displayName, CancellationToken cancellationToken = default) =>
+            inner.EnsureProfileAsync(userId, displayName, cancellationToken);
+
+        public Task<IReadOnlyList<UserProfile>> ListAllAsync(CancellationToken cancellationToken = default) => inner.ListAllAsync(cancellationToken);
+
+        public Task UpdateAsync(string userId, Action<UserProfile> change, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("A plain profile repository has no app fields to update.");
+
+        public Task SetRoleAsync(string userId, string role, CancellationToken cancellationToken = default) => inner.SetRoleAsync(userId, role, cancellationToken);
+
+        public Task SetDisabledAsync(string userId, bool disabled, CancellationToken cancellationToken = default) =>
+            inner.SetDisabledAsync(userId, disabled, cancellationToken);
+    }
+}
+
+/// <summary>The profile cache for an app's own profile class (see <see cref="IUserProfileRepository{TProfile}"/>); it answers WebCore's
+/// <see cref="IUserProfileRepository"/> too, from the same copies.</summary>
+public class CachedUserProfileRepository<TProfile> : ProfileRepositoryBase<TProfile>, IDisposable
+    where TProfile : UserProfile
+{
+    private readonly IUserProfileRepository<TProfile> _inner;
+    private readonly KeyedCache<string, TProfile> _byUser;
+    private readonly SnapshotCache<IReadOnlyList<TProfile>> _all;
+
+    public CachedUserProfileRepository(IUserProfileRepository<TProfile> inner, TimeSpan? ttl = null, Func<DateTimeOffset>? now = null)
     {
         _inner = inner;
         var lifetime = ttl ?? AccountCacheDefaults.ShortLived;
-        _byUser = new KeyedCache<string, UserProfile>("profiles.byUser", lifetime, now, copy: p => p.Clone());
-        _all = new SnapshotCache<IReadOnlyList<UserProfile>>("profiles.all", lifetime, now, profiles => profiles.Select(p => p.Clone()).ToList());
+        _byUser = new KeyedCache<string, TProfile>("profiles.byUser", lifetime, now, copy: p => (TProfile)p.Clone());
+        _all = new SnapshotCache<IReadOnlyList<TProfile>>("profiles.all", lifetime, now, profiles => profiles.Select(p => (TProfile)p.Clone()).ToList());
     }
 
-    public async Task<UserProfile?> GetAsync(string userId, CancellationToken cancellationToken = default)
+    public override async Task<TProfile?> GetAsync(string userId, CancellationToken cancellationToken = default)
     {
         return await _byUser.GetOrLoadAsync(userId, ct => _inner.GetAsync(userId, ct), cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<UserProfile> EnsureProfileAsync(string userId, string displayName, CancellationToken cancellationToken = default)
+    public override Task UpdateAsync(string userId, Action<TProfile> change, CancellationToken cancellationToken = default) =>
+        Write(() => _inner.UpdateAsync(userId, change, cancellationToken));
+
+    public override async Task<TProfile> EnsureProfileAsync(string userId, string displayName, CancellationToken cancellationToken = default)
     {
         // A copy that already has this display name needs no write: the common case (every page load).
         if (_byUser.TryGet(userId, out var cached) && cached.DisplayName == displayName)
@@ -128,13 +162,13 @@ public class CachedUserProfileRepository : IUserProfileRepository, IDisposable
         return profile;
     }
 
-    public Task SetRoleAsync(string userId, string role, CancellationToken cancellationToken = default) =>
+    public override Task SetRoleAsync(string userId, string role, CancellationToken cancellationToken = default) =>
         Write(() => _inner.SetRoleAsync(userId, role, cancellationToken));
 
-    public Task SetDisabledAsync(string userId, bool disabled, CancellationToken cancellationToken = default) =>
+    public override Task SetDisabledAsync(string userId, bool disabled, CancellationToken cancellationToken = default) =>
         Write(() => _inner.SetDisabledAsync(userId, disabled, cancellationToken));
 
-    public Task<IReadOnlyList<UserProfile>> ListAllAsync(CancellationToken cancellationToken = default) => _all.GetAsync(_inner.ListAllAsync, cancellationToken);
+    public override Task<IReadOnlyList<TProfile>> ListAllAsync(CancellationToken cancellationToken = default) => _all.GetAsync(_inner.ListAllAsync, cancellationToken);
 
     public void Invalidate()
     {

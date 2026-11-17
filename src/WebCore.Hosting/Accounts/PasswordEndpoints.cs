@@ -18,12 +18,13 @@ internal static class PasswordEndpoints
         forms.MapPost("/account/password-change", ChangeAsync).RequireAuthorization();
     }
 
-    private static async Task<IResult> SendResetCodeAsync(HttpContext http, AccountEmailService accountEmail, AccountOptions options)
+    private static async Task<IResult> SendResetCodeAsync(HttpContext http, AccountEmailService accountEmail, AccountServicesBundle bundle)
     {
+        var options = bundle.Options;
         var form = await http.Request.ReadFormAsync();
         var email = form["email"].ToString().Trim();
         var result = await accountEmail.RequestPasswordResetAsync(email, CodeClient.KeyFor(http, options));
-        var common = "&email=" + Uri.EscapeDataString(email);
+        var common = bundle.FormMemory.QueryPart(http, email);
         return result.Status == EmailRequestStatus.Sent
             ? Results.Redirect(options.ForgotPasswordPath + "?step=code" + common + AccountEndpoints.DevCode(result))
             : Results.Redirect(options.ForgotPasswordPath + "?codeError=" + AccountEndpoints.Code(result.Status) + common);
@@ -33,10 +34,10 @@ internal static class PasswordEndpoints
     {
         var options = bundle.Options;
         var form = await http.Request.ReadFormAsync();
-        var email = form["email"].ToString().Trim();
+        var email = (form["email"].ToString() is { Length: > 0 } typed ? typed : bundle.FormMemory.Recall(http) ?? string.Empty).Trim();
         var password = form["password"].ToString();
         var confirmation = form["confirmPassword"].ToString();
-        var common = "&email=" + Uri.EscapeDataString(email);
+        var common = bundle.FormMemory.QueryPart(http, email);
 
         // The password is checked first, so a typo doesn't spend one of the code's five tries.
         var problem = PasswordRules.Check(password, confirmation);
