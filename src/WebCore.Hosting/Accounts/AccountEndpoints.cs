@@ -19,7 +19,8 @@ public static class AccountEndpoints
     public static void MapWebCoreAccountEndpoints(this WebApplication app)
     {
         var forms = app.MapFormGroup();
-        forms.MapPost("/account/logout", LogoutAsync);
+        // An explicit delegate: handed over as a bare method group, this one-parameter handler answered an empty 200 (no Location) in a host that mapped it (found 2026-11-17).
+        forms.MapPost("/account/logout", new Func<HttpContext, Task<IResult>>(LogoutAsync));
         forms.MapPost("/account/register-submit", RegisterAsync);
         forms.MapPost("/account/login-submit", LoginAsync);
         forms.MapPost("/account/code-send", SendSignInCodeAsync);
