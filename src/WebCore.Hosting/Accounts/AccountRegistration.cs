@@ -134,8 +134,8 @@ public static class AccountRegistration
                 cookie.ExpireTimeSpan = options.CookieLifetime;
                 cookie.SlidingExpiration = true;
                 // The cookie handler treats a sign-out request to its LogoutPath (default "/Account/Logout", matched without regard to case) as one it redirects
-                // itself, which swallowed this module's own redirect (200, no Location). Sign-out here is a form post answered by the endpoint, so the handler gets none.
-                cookie.LogoutPath = PathString.Empty;
+                // itself, which swallowed this module's own redirect (200, no Location). Sign-out here is a form post answered by the endpoint, so the handler is pointed at a path nothing uses (an empty path is filled back in with the default).
+                cookie.LogoutPath = "/account/cookie-handler-logout-unused";
                 cookie.LoginPath = options.LoginPath;
                 cookie.AccessDeniedPath = options.DeniedPath;
                 cookie.Events.OnSignedIn = context => context.HttpContext.RequestServices.GetRequiredService<AccountSessionEvents>().SignedInAsync(context);

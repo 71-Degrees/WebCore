@@ -5,6 +5,7 @@
  */
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using WebCore.Accounts;
@@ -28,7 +29,7 @@ public sealed class AccountCookieTests : IDisposable
     }
 
     [Fact]
-    public async Task TheCookieHandler_HasNoLogoutPath_SoItNeverSwallowsTheLogoutEndpointsRedirect()
+    public async Task TheCookieHandler_PointsAtNoRealLogoutPath_SoItNeverSwallowsTheLogoutEndpointsRedirect()
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Production" });
         builder.AddWebCoreAccounts(o =>
@@ -42,6 +43,6 @@ public sealed class AccountCookieTests : IDisposable
 
         var cookie = app.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get(CookieAuthenticationDefaults.AuthenticationScheme);
 
-        Assert.False(cookie.LogoutPath.HasValue);
+        Assert.False(cookie.LogoutPath.Equals(new PathString("/account/logout")));
     }
 }
