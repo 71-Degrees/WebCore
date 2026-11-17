@@ -28,6 +28,18 @@ public class UserProfileRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task EnsureProfileAsync_UnreadableDocument_IsServedAsDefaultAndNeverOverwritten()
+    {
+        var path = Path.Combine(_tempFolder, DocumentNames.For("user1", "user"));
+        await File.WriteAllTextAsync(path, "{ not json");
+
+        var profile = await _repository.EnsureProfileAsync("user1", "Alice");
+
+        Assert.Equal("Member", profile.Role);
+        Assert.Equal("{ not json", await File.ReadAllTextAsync(path));
+    }
+
+    [Fact]
     public async Task GetAsync_UnknownUser_ReturnsNull()
     {
         Assert.Null(await _repository.GetAsync("unknown"));

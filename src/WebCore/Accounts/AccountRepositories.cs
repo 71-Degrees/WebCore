@@ -3,6 +3,8 @@
  * Copyright © 2026 71 Degrees. All rights reserved.
  * ---------------------------------------------------------------------------
  */
+using System.Text.Json;
+
 namespace WebCore.Accounts;
 
 public interface IUserRepository
@@ -22,6 +24,30 @@ public interface IUserRepository
 
     /// <summary>Throws <see cref="InvalidOperationException"/> if the email is already registered.</summary>
     Task<User> CreateAsync(User user, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// The same accounts as the app's own account class (<typeparamref name="TUser"/>, deriving from <see cref="User"/>), for an app that keeps fields of its own
+/// on the account (a sign-up address, a counter). WebCore reads and writes accounts through <see cref="IUserRepository"/>; the same repository answers both,
+/// so the app's fields survive every WebCore save.
+/// </summary>
+public interface IUserRepository<TUser>
+    where TUser : User
+{
+    /// <summary>As <see cref="IUserRepository.CreateAsync"/>, for the app's class.</summary>
+    Task<TUser> CreateAsync(TUser user, CancellationToken cancellationToken = default);
+
+    /// <summary>As <see cref="IUserRepository.SaveAsync"/>, for the app's class.</summary>
+    Task SaveAsync(TUser user, CancellationToken cancellationToken = default);
+
+    /// <summary>As <see cref="IUserRepository.ChangeEmailAsync"/>, for the app's class.</summary>
+    Task ChangeEmailAsync(TUser user, string newEmail, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TUser>> ListAsync(CancellationToken cancellationToken = default);
+
+    Task<TUser?> GetByIdAsync(string id, CancellationToken cancellationToken = default);
+
+    Task<TUser?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
 }
 
 public interface IUserProfileRepository
@@ -92,4 +118,64 @@ public abstract class ProfileRepositoryBase<TProfile> : IUserProfileRepository<T
 
     async Task<IReadOnlyList<UserProfile>> IUserProfileRepository.ListAllAsync(CancellationToken cancellationToken) =>
         await ListAllAsync(cancellationToken).ConfigureAwait(false);
+}
+
+/// <summary>An account repository for the app's class that answers WebCore's plain <see cref="IUserRepository"/> too: the one place that knows how the
+/// typed answers become plain ones, and how a plain account handed in becomes the app's class.</summary>
+public abstract class UserRepositoryBase<TUser> : IUserRepository<TUser>, IUserRepository
+    where TUser : User, new()
+{
+    public abstract Task<TUser?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
+
+    public abstract Task<TUser?> GetByIdAsync(string id, CancellationToken cancellationToken = default);
+
+    public abstract Task<IReadOnlyList<TUser>> ListAsync(CancellationToken cancellationToken = default);
+
+    public abstract Task SaveAsync(TUser user, CancellationToken cancellationToken = default);
+
+    public abstract Task ChangeEmailAsync(TUser user, string newEmail, CancellationToken cancellationToken = default);
+
+    public abstract Task<TUser> CreateAsync(TUser user, CancellationToken cancellationToken = default);
+
+    async Task<User?> IUserRepository.GetByEmailAsync(string email, CancellationToken cancellationToken) =>
+        await GetByEmailAsync(email, cancellationToken).ConfigureAwait(false);
+
+    async Task<User?> IUserRepository.GetByIdAsync(string id, CancellationToken cancellationToken) =>
+        await GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
+
+    async Task<IReadOnlyList<User>> IUserRepository.ListAsync(CancellationToken cancellationToken) =>
+        await ListAsync(cancellationToken).ConfigureAwait(false);
+
+    async Task IUserRepository.SaveAsync(User user, CancellationToken cancellationToken) =>
+        await SaveAsync(Typed(user), cancellationToken).ConfigureAwait(false);
+
+    // A plain account handed in is copied first, so the new address lands on the copy and not on the caller's object.
+    async Task IUserRepository.ChangeEmailAsync(User user, string newEmail, CancellationToken cancellationToken) =>
+        await ChangeEmailAsync(Typed(user), newEmail, cancellationToken).ConfigureAwait(false);
+
+    async Task<User> IUserRepository.CreateAsync(User user, CancellationToken cancellationToken) =>
+        await CreateAsync(Typed(user), cancellationToken).ConfigureAwait(false);
+
+    /// <summary>The one place a plain <see cref="User"/> becomes the app's class. A stored account already is one (every read returns the app's class), so
+    /// the copy happens only for a plain account handed in by WebCore's own services. Every field WebCore knows is copied; the app's own fields start at
+    /// their defaults.</summary>
+    protected static TUser Typed(User user)
+    {
+        if (user is TUser typed)
+        {
+            return typed;
+        }
+
+        return new TUser
+        {
+            Id = user.Id,
+            Email = user.Email,
+            DisplayName = user.DisplayName,
+            PasswordHash = user.PasswordHash,
+            SecurityStamp = user.SecurityStamp,
+            EmailVerifiedAt = user.EmailVerifiedAt,
+            CreatedAt = user.CreatedAt,
+            UnknownFields = user.UnknownFields is null ? null : new Dictionary<string, JsonElement>(user.UnknownFields),
+        };
+    }
 }

@@ -24,60 +24,45 @@ internal static class AccountCacheDefaults
 /// handed out: a list caller gets copies, a lookup copies only the account it finds. Lookups by email (a direct document read) and all writes go straight
 /// through; a write clears the list at once.
 /// </summary>
-public class CachedUserRepository : IUserRepository, IDisposable
+/// <summary>
+/// The account list for the app's own account class (<typeparamref name="TUser"/>), with the same copies, lookups and invalidation as <see cref="CachedUserRepository"/>.
+/// </summary>
+public class CachedUserRepository<TUser> : UserRepositoryBase<TUser>, IDisposable
+    where TUser : User, new()
 {
-    private readonly IUserRepository _inner;
-    private readonly SnapshotCache<IReadOnlyList<User>> _all;
+    private readonly IUserRepository<TUser> _inner;
+    private readonly SnapshotCache<IReadOnlyList<TUser>> _all;
 
-    public CachedUserRepository(IUserRepository inner, TimeSpan? ttl = null, Func<DateTimeOffset>? now = null)
+    public CachedUserRepository(IUserRepository<TUser> inner, TimeSpan? ttl = null, Func<DateTimeOffset>? now = null)
     {
         _inner = inner;
-        _all = new SnapshotCache<IReadOnlyList<User>>("users.all", ttl ?? AccountCacheDefaults.ShortLived, now);
+        _all = new SnapshotCache<IReadOnlyList<TUser>>("users.all", ttl ?? AccountCacheDefaults.ShortLived, now);
     }
 
-    public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default) => _inner.GetByEmailAsync(email, cancellationToken);
+    public override Task<TUser?> GetByEmailAsync(string email, CancellationToken cancellationToken = default) => _inner.GetByEmailAsync(email, cancellationToken);
 
-    public async Task<User?> GetByIdAsync(string id, CancellationToken cancellationToken = default) =>
-        string.IsNullOrWhiteSpace(id) ? null : (await _all.GetAsync(_inner.ListAsync, cancellationToken).ConfigureAwait(false)).FirstOrDefault(u => u.Id == id)?.Clone();
-
-    public async Task<IReadOnlyList<User>> ListAsync(CancellationToken cancellationToken = default) =>
-        (await _all.GetAsync(_inner.ListAsync, cancellationToken).ConfigureAwait(false)).Select(u => u.Clone()).ToList();
-
-    public async Task SaveAsync(User user, CancellationToken cancellationToken = default)
+    public override async Task<TUser?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
     {
-        try
+        if (string.IsNullOrWhiteSpace(id))
         {
-            await _inner.SaveAsync(user, cancellationToken).ConfigureAwait(false);
+            return null;
         }
-        finally
-        {
-            Invalidate();
-        }
+
+        var found = (await _all.GetAsync(_inner.ListAsync, cancellationToken).ConfigureAwait(false)).FirstOrDefault(u => u.Id == id);
+        return found is null ? null : Copy(found);
     }
 
-    public async Task ChangeEmailAsync(User user, string newEmail, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            await _inner.ChangeEmailAsync(user, newEmail, cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            Invalidate();
-        }
-    }
+    public override async Task<IReadOnlyList<TUser>> ListAsync(CancellationToken cancellationToken = default) =>
+        (await _all.GetAsync(_inner.ListAsync, cancellationToken).ConfigureAwait(false)).Select(u => Copy(u)).ToList();
 
-    public async Task<User> CreateAsync(User user, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            return await _inner.CreateAsync(user, cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            Invalidate();
-        }
-    }
+    public override Task SaveAsync(TUser user, CancellationToken cancellationToken = default) =>
+        WriteThenInvalidate(() => _inner.SaveAsync(user, cancellationToken));
+
+    public override Task ChangeEmailAsync(TUser user, string newEmail, CancellationToken cancellationToken = default) =>
+        WriteThenInvalidate(() => _inner.ChangeEmailAsync(user, newEmail, cancellationToken));
+
+    public override Task<TUser> CreateAsync(TUser user, CancellationToken cancellationToken = default) =>
+        WriteThenInvalidateAsync(() => _inner.CreateAsync(user, cancellationToken));
 
     public void Invalidate() => _all.Invalidate();
 
@@ -86,6 +71,59 @@ public class CachedUserRepository : IUserRepository, IDisposable
     {
         _all.Dispose();
         GC.SuppressFinalize(this);
+    }
+
+    private static TUser Copy(TUser user) => (TUser)user.Clone();
+
+    private async Task WriteThenInvalidate(Func<Task> write)
+    {
+        try
+        {
+            await write().ConfigureAwait(false);
+        }
+        finally
+        {
+            Invalidate();
+        }
+    }
+
+    private async Task<TUser> WriteThenInvalidateAsync(Func<Task<TUser>> write)
+    {
+        try
+        {
+            return await write().ConfigureAwait(false);
+        }
+        finally
+        {
+            Invalidate();
+        }
+    }
+}
+
+/// <summary>
+/// The account list (the admin users page reads every account), and lookups by id served from it: the store has no index by id, so going straight through
+/// would read every account for each lookup, and the sign-in cookie check looks one up on every request (its security stamp). The shared list is never
+/// handed out: a list caller gets copies, a lookup copies only the account it finds. Lookups by email (a direct document read) and all writes go straight
+/// through; a write clears the list at once.
+/// </summary>
+public class CachedUserRepository(IUserRepository inner, TimeSpan? ttl = null, Func<DateTimeOffset>? now = null)
+    : CachedUserRepository<User>(new PlainUsers(inner), ttl, now)
+{
+    /// <summary>Wraps a plain repository (a test double, or a counting proxy) and shows the plain account shape to the typed base.</summary>
+    private sealed class PlainUsers(IUserRepository inner) : IUserRepository<User>
+    {
+        public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default) => inner.GetByEmailAsync(email, cancellationToken);
+
+        public Task<User?> GetByIdAsync(string id, CancellationToken cancellationToken = default) => inner.GetByIdAsync(id, cancellationToken);
+
+        public Task<IReadOnlyList<User>> ListAsync(CancellationToken cancellationToken = default) => inner.ListAsync(cancellationToken);
+
+        public Task SaveAsync(User user, CancellationToken cancellationToken = default) => inner.SaveAsync(user, cancellationToken);
+
+        public Task ChangeEmailAsync(User user, string newEmail, CancellationToken cancellationToken = default) =>
+            inner.ChangeEmailAsync(user, newEmail, cancellationToken);
+
+        public Task<User> CreateAsync(User user, CancellationToken cancellationToken = default) => inner.CreateAsync(user, cancellationToken);
     }
 }
 

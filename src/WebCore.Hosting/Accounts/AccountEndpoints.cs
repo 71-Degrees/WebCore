@@ -86,7 +86,8 @@ public static class AccountEndpoints
         var user = new User { Email = email, DisplayName = displayName, PasswordHash = PasswordHasher.Hash(password) };
         try
         {
-            await users.CreateAsync(user);
+            // The stored account: an app's own account class is a copy of the plain one made above, and the signup policy must see (and may change) that one.
+            user = await users.CreateAsync(user);
         }
         catch (InvalidOperationException)
         {

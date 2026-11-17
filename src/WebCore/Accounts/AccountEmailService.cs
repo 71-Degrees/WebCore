@@ -204,7 +204,7 @@ public sealed class AccountEmailService : IDisposable
                     DisplayName = DisplayNames.IsValid(desiredName) ? DisplayNames.Tidy(desiredName) : DefaultDisplayName(email),
                     EmailVerifiedAt = _now(),
                 };
-                await _users.CreateAsync(user, cancellationToken).ConfigureAwait(false);
+                user = await _users.CreateAsync(user, cancellationToken).ConfigureAwait(false);
                 return new AccountCodeResult(CodeCheckStatus.Confirmed, user, IsNewAccount: true);
             }
 

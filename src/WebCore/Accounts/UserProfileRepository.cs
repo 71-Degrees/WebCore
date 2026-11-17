@@ -5,12 +5,13 @@
  */
 using System.Collections.Concurrent;
 using WebCore.Storage;
+using Microsoft.Extensions.Logging;
 
 namespace WebCore.Accounts;
 
 /// <summary>Profiles of the plain <see cref="UserProfile"/> shape, for an app with no profile fields of its own.</summary>
-public sealed class UserProfileRepository(IDocumentStore store, AccountRoles roles, TimeProvider? timeProvider = null)
-    : UserProfileRepository<UserProfile>(store, roles, timeProvider);
+public sealed class UserProfileRepository(IDocumentStore store, AccountRoles roles, TimeProvider? timeProvider = null, ILogger? logger = null)
+    : UserProfileRepository<UserProfile>(store, roles, timeProvider, logger);
 
 /// <summary>
 /// One profile document per user, named by user id, read as the app's profile class. The id is validated (<see cref="DocumentNames"/>) because an id
@@ -20,7 +21,7 @@ public sealed class UserProfileRepository(IDocumentStore store, AccountRoles rol
 /// old document and both write: a lost update at best and, on Windows, an exception out of the file move. One lock per user id serializes that cycle
 /// without blocking anyone else; in-process locking is enough because each app runs as a single instance.
 /// </summary>
-public class UserProfileRepository<TProfile>(IDocumentStore store, AccountRoles roles, TimeProvider? timeProvider = null)
+public class UserProfileRepository<TProfile>(IDocumentStore store, AccountRoles roles, TimeProvider? timeProvider = null, ILogger? logger = null)
     : ProfileRepositoryBase<TProfile>
     where TProfile : UserProfile, new()
 {
@@ -41,7 +42,18 @@ public class UserProfileRepository<TProfile>(IDocumentStore store, AccountRoles 
                 return profile;
             }
 
-            profile ??= new TProfile { UserId = userId, Role = roles.Default };
+            if (profile is null)
+            {
+                profile = new TProfile { UserId = userId, Role = roles.Default, CreatedAt = Now(), DisplayName = displayName };
+                if (await store.ExistsAsync(NameFor(userId), cancellationToken).ConfigureAwait(false))
+                {
+                    // The store reads a blob it cannot parse as "absent". Writing a fresh default profile over it would silently demote an admin and destroy
+                    // the evidence, so this request gets a default that is not saved and the blob is left for someone to repair.
+                    logger?.LogError("The profile document for user {UserId} exists but could not be read; serving a default profile for this request without saving it", userId);
+                    return profile;
+                }
+            }
+
             profile.DisplayName = displayName;
             await store.SetAsync(NameFor(userId), profile, cancellationToken).ConfigureAwait(false);
             return profile;
@@ -61,7 +73,7 @@ public class UserProfileRepository<TProfile>(IDocumentStore store, AccountRoles 
             profile =>
             {
                 profile.IsDisabled = disabled;
-                profile.DisabledAt = disabled ? (timeProvider ?? TimeProvider.System).GetUtcNow() : null;
+                profile.DisabledAt = disabled ? Now() : null;
             },
             cancellationToken);
 
@@ -110,4 +122,6 @@ public class UserProfileRepository<TProfile>(IDocumentStore store, AccountRoles 
     private SemaphoreSlim GateFor(string userId) => _userLocks.GetOrAdd(userId, static _ => new SemaphoreSlim(1, 1));
 
     private static string NameFor(string userId) => DocumentNames.For(userId, "user");
+
+    private DateTimeOffset Now() => (timeProvider ?? TimeProvider.System).GetUtcNow();
 }

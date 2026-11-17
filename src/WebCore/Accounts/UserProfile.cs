@@ -28,6 +28,10 @@ public class UserProfile
 
     public DateTimeOffset? DisabledAt { get; set; }
 
+    /// <summary>When the profile was first made (the repository sets it when it creates one). Null on a profile older than the field: the time is not known,
+    /// and is never guessed.</summary>
+    public DateTimeOffset? CreatedAt { get; set; }
+
     /// <summary>Fields this code does not know (an app's own profile fields, or a newer version's): read and written back unchanged.</summary>
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? UnknownFields { get; set; }
