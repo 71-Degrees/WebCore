@@ -73,6 +73,14 @@ public sealed class AccountOptions
     /// <summary>Where an admin lands after starting a masquerade.</summary>
     public string MasqueradeLandingPath { get; set; } = "/";
 
+    /// <summary>True: an account with a password that never proved its email loses the password when its owner proves the address by code. False, the
+    /// default, keeps it (see <see cref="AccountEmailOptions.ClearUnverifiedPassword"/>).</summary>
+    public bool ClearUnverifiedPassword { get; set; }
+
+    /// <summary>Called with the account and the answer each time a confirmation code is sent or fails to send, so the app can record it on the account.
+    /// Null, the default, records nothing (see <see cref="AccountEmailOptions.OnConfirmationRequested"/>).</summary>
+    public Action<User, EmailRequestStatus>? OnConfirmationRequested { get; set; }
+
     internal void Validate()
     {
         if (Roles is null || UsersStore is null || ProfilesStore is null || string.IsNullOrWhiteSpace(BrandName))

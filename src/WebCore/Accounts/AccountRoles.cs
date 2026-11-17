@@ -16,6 +16,11 @@ namespace WebCore.Accounts;
 public sealed class AccountRoles
 {
     public AccountRoles(IReadOnlyList<string> names, string defaultRole, string adminRole)
+        : this(names, defaultRole, adminRole, new HashSet<string>(StringComparer.Ordinal))
+    {
+    }
+
+    private AccountRoles(IReadOnlyList<string> names, string defaultRole, string adminRole, IReadOnlySet<string> passwordRequired)
     {
         if (names.Count == 0 || !names.Contains(defaultRole, StringComparer.Ordinal) || !names.Contains(adminRole, StringComparer.Ordinal))
         {
@@ -25,7 +30,10 @@ public sealed class AccountRoles
         Names = names;
         Default = defaultRole;
         Admin = adminRole;
+        _passwordRequired = passwordRequired;
     }
+
+    private readonly IReadOnlySet<string> _passwordRequired;
 
     /// <summary>Every role, in the order of the app's enum (the order its old numeric documents used).</summary>
     public IReadOnlyList<string> Names { get; }
@@ -43,6 +51,23 @@ public sealed class AccountRoles
     public bool IsKnown(string? role) => role is not null && Names.Contains(role, StringComparer.Ordinal);
 
     public bool IsAdmin(string? role) => string.Equals(role, Admin, StringComparison.Ordinal);
+
+    /// <summary>The same roles, with the named ones also required to sign in with their password, never by an emailed code alone (an organizer, for
+    /// example). Every name must be one of <see cref="Names"/>. The admin role always requires its password (<see cref="RequiresPassword"/>).</summary>
+    public AccountRoles WithPasswordRequired(params string[] roleNames)
+    {
+        if (roleNames.Any(r => !IsKnown(r)))
+        {
+            throw new ArgumentException("Every password-required role must be one of the role names.", nameof(roleNames));
+        }
+
+        var required = new HashSet<string>(_passwordRequired, StringComparer.Ordinal);
+        required.UnionWith(roleNames);
+        return new AccountRoles(Names, Default, Admin, required);
+    }
+
+    /// <summary>True when the role must sign in with its password: the admin role, and any role added with <see cref="WithPasswordRequired"/>.</summary>
+    public bool RequiresPassword(string? role) => IsAdmin(role) || (role is not null && _passwordRequired.Contains(role));
 
     /// <summary>
     /// The stored value as a role name: a number from a document saved before roles were strings becomes the name at that index; a name is kept as it is,

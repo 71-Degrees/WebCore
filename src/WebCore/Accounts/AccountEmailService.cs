@@ -43,8 +43,8 @@ public enum CodeCheckStatus
     /// <summary>Changing email only: another account already uses that address.</summary>
     EmailInUse,
 
-    /// <summary>The account is an Admin and has a password, so it must sign in with it - an emailed code alone
-    /// is not enough to open an account that can manage other accounts.</summary>
+    /// <summary>The account is an Admin (or another role the app requires a password for) and has a password, so it must sign in with it - an emailed code
+    /// alone is not enough to open an account that can manage other accounts.</summary>
     UsePassword,
 }
 
@@ -66,7 +66,16 @@ public sealed record AccountEmailOptions(
     bool ExposeCodeForDevelopment = false,
     int MaxPerClientPerHour = AccountEmailService.DefaultMaxPerClientPerHour,
     int MaxPerHour = AccountEmailService.DefaultMaxPerHour,
-    int MaxPerDay = AccountEmailService.DefaultMaxPerDay);
+    int MaxPerDay = AccountEmailService.DefaultMaxPerDay)
+{
+    /// <summary>True: an account that has a password but never proved its email loses that password when its owner proves the address by code (whoever
+    /// registered it may not own it). False, the default, keeps the password.</summary>
+    public bool ClearUnverifiedPassword { get; init; }
+
+    /// <summary>Called with the account and the answer each time a confirmation code is sent or fails to send, so the app can record it on the account. The
+    /// hook changes the app's own fields and WebCore saves them. A throwing hook never fails the request. Null, the default, records nothing.</summary>
+    public Action<User, EmailRequestStatus>? OnConfirmationRequested { get; init; }
+}
 
 /// <summary>
 /// Email is how an account proves its address. Confirming a six-digit code either signs into the account for that
@@ -81,6 +90,7 @@ public sealed class AccountEmailService : IDisposable
     private const int MaxAttempts = 5;
     private const int MaxRequestsPerHour = 5;
     private const int MaxTrackedKeys = 5000;
+    private static readonly TimeSpan LimiterWindow = TimeSpan.FromHours(1);
 
     // Ceilings that protect the mail account itself, whatever a caller does: one browser can't ask for many codes,
     // and all code emails together stay well inside a personal mailbox's daily sending allowance (about 500),
@@ -99,7 +109,27 @@ public sealed class AccountEmailService : IDisposable
 
         public DateTimeOffset ExpiresAt { get; init; }
 
-        public int Attempts { get; set; }
+        private int _attempts;
+
+        public int Attempts => Volatile.Read(ref _attempts);
+
+        /// <summary>Spends one guess, atomically: parallel guesses cannot between them get past <paramref name="max"/>.</summary>
+        public bool TryTakeAttempt(int max)
+        {
+            while (true)
+            {
+                var current = Volatile.Read(ref _attempts);
+                if (current >= max)
+                {
+                    return false;
+                }
+
+                if (Interlocked.CompareExchange(ref _attempts, current + 1, current) == current)
+                {
+                    return true;
+                }
+            }
+        }
     }
 
     private readonly IUserRepository _users;
@@ -109,9 +139,11 @@ public sealed class AccountEmailService : IDisposable
     private readonly string _brand;
     private readonly bool _deliveryConfigured;
     private readonly bool _exposeCode;
+    private readonly bool _clearUnverifiedPassword;
+    private readonly Action<User, EmailRequestStatus>? _onConfirmationRequested;
     private readonly Func<DateTimeOffset> _now;
     private readonly ConcurrentDictionary<string, Pending> _pending = new();
-    private readonly ConcurrentDictionary<string, SlidingWindowRateLimiter> _limiters = new();
+    private readonly LimiterTable _limiters = new(MaxTrackedKeys, LimiterWindow);
     private readonly SlidingWindowRateLimiter _hourlyCap;
     private readonly SlidingWindowRateLimiter _dailyCap;
     private readonly int _maxPerClientPerHour;
@@ -136,6 +168,8 @@ public sealed class AccountEmailService : IDisposable
         _brand = options.BrandName;
         _deliveryConfigured = options.DeliveryConfigured;
         _exposeCode = options.ExposeCodeForDevelopment;
+        _clearUnverifiedPassword = options.ClearUnverifiedPassword;
+        _onConfirmationRequested = options.OnConfirmationRequested;
         _now = now ?? TimeProvider.System.GetUtcNow;
         _onSendFailure = onSendFailure;
         _maxPerClientPerHour = options.MaxPerClientPerHour;
@@ -209,13 +243,18 @@ public sealed class AccountEmailService : IDisposable
             }
 
             var profile = await _profiles.GetAsync(user.Id, cancellationToken).ConfigureAwait(false);
-            if (profile is not null && _roles.IsAdmin(profile.Role) && !string.IsNullOrEmpty(user.PasswordHash))
+            if (profile is not null && _roles.RequiresPassword(profile.Role) && !string.IsNullOrEmpty(user.PasswordHash))
             {
                 return new AccountCodeResult(CodeCheckStatus.UsePassword);
             }
 
             if (user.EmailVerifiedAt is null)
             {
+                if (_clearUnverifiedPassword)
+                {
+                    ClearUnverifiedPassword(user);
+                }
+
                 user.EmailVerifiedAt = _now();
                 await _users.SaveAsync(user, cancellationToken).ConfigureAwait(false);
             }
@@ -226,6 +265,19 @@ public sealed class AccountEmailService : IDisposable
         {
             _writeLock.Release();
         }
+    }
+
+    /// <summary>Password registration never proved the address, so whoever registered it may not own it. When the real owner
+    /// proves it by code, that password is dropped and the new stamp ends every cookie issued under it.</summary>
+    private static void ClearUnverifiedPassword(User user)
+    {
+        if (string.IsNullOrEmpty(user.PasswordHash))
+        {
+            return;
+        }
+
+        user.PasswordHash = string.Empty;
+        user.RotateSecurityStamp();
     }
 
     /// <summary>Forgot password, step one: a code goes to the address if an account uses it. The answer is the same (Sent) whether
@@ -240,10 +292,23 @@ public sealed class AccountEmailService : IDisposable
 
         if (await _users.GetByEmailAsync(email, cancellationToken).ConfigureAwait(false) is null)
         {
-            return new EmailRequestResult(_deliveryConfigured || _exposeCode ? EmailRequestStatus.Sent : EmailRequestStatus.Unavailable);
+            return UnknownAddressReset(email, clientKey);
         }
 
         return await SendCodeAsync("reset|" + Hash(email) + "|" + clientKey, email, "reset your password for", _brand, clientKey, cancellationToken).ConfigureAwait(false);
+    }
+
+    // An address with no account spends the same per-address and per-browser limits a real one does, so the limits never show which addresses are
+    // registered, and it gets the same answer. Nothing is sent and the mail ceilings are not spent.
+    private EmailRequestResult UnknownAddressReset(string email, string clientKey)
+    {
+        if (!_deliveryConfigured && !_exposeCode)
+        {
+            return new EmailRequestResult(EmailRequestStatus.Unavailable);
+        }
+
+        var allowed = TryAcquire("email|" + email) && TryAcquire("client|" + clientKey, _maxPerClientPerHour);
+        return new EmailRequestResult(allowed ? EmailRequestStatus.Sent : EmailRequestStatus.RateLimited);
     }
 
     /// <summary>Step two: checks the code from the email and returns the account it proves. The caller sets the new password with
@@ -286,9 +351,61 @@ public sealed class AccountEmailService : IDisposable
         }
 
         var user = string.IsNullOrWhiteSpace(userId) ? null : await _users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false);
-        return user is null
-            ? new EmailRequestResult(EmailRequestStatus.NotSignedIn)
-            : await SendCodeAsync("confirm|" + user.Id, email, "confirm your email for", user.DisplayName, "user|" + user.Id, cancellationToken).ConfigureAwait(false);
+        if (user is null)
+        {
+            return new EmailRequestResult(EmailRequestStatus.NotSignedIn);
+        }
+
+        var result = await SendCodeAsync("confirm|" + user.Id, email, "confirm your email for", user.DisplayName, "user|" + user.Id, cancellationToken).ConfigureAwait(false);
+        if (_onConfirmationRequested is { } record && result.Status is EmailRequestStatus.Sent or EmailRequestStatus.SendFailed)
+        {
+            await RecordConfirmationRequestAsync(user.Id, record, result.Status, cancellationToken).ConfigureAwait(false);
+        }
+
+        return result;
+    }
+
+    /// <summary>The address a still-usable confirmation code was sent to, or null when there is none (never asked, expired,
+    /// used up or discarded). Lets the confirm box open for a code the person did not request themselves - an admin's
+    /// "Resend code" - instead of waiting for them to click "Email me a code" (which would replace the code they hold).
+    /// Reading it changes nothing and does not count as a guess.</summary>
+    public string? PendingConfirmationEmail(string? userId)
+    {
+        if (string.IsNullOrWhiteSpace(userId) || !_pending.TryGetValue("confirm|" + userId, out var pending))
+        {
+            return null;
+        }
+
+        return pending.ExpiresAt < _now() || pending.Attempts >= MaxAttempts ? null : pending.Email;
+    }
+
+    // Lets the app record on the account what the confirmation request did (the hook changes the app's own fields and they are saved here). The record
+    // is a side note: a failure to record never fails the request itself.
+    private async Task RecordConfirmationRequestAsync(string userId, Action<User, EmailRequestStatus> record, EmailRequestStatus status, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                var user = await _users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false);
+                if (user is null)
+                {
+                    return;
+                }
+
+                record(user, status);
+                await _users.SaveAsync(user, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                _writeLock.Release();
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _onSendFailure?.Invoke(ex);
+        }
     }
 
     /// <summary>Confirms the code: the address it was sent to becomes the account's confirmed email.</summary>
@@ -407,13 +524,12 @@ public sealed class AccountEmailService : IDisposable
             return (CodeCheckStatus.Expired, null);
         }
 
-        if (pending.Attempts >= MaxAttempts)
+        if (!pending.TryTakeAttempt(MaxAttempts))
         {
             _pending.TryRemove(pendingKey, out _);
             return (CodeCheckStatus.TooManyAttempts, null);
         }
 
-        pending.Attempts++;
         var supplied = Hash(pending.Salt + ":" + (code ?? string.Empty).Trim());
         if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(supplied), Encoding.UTF8.GetBytes(pending.CodeHash)))
         {
@@ -424,15 +540,7 @@ public sealed class AccountEmailService : IDisposable
         return (CodeCheckStatus.Confirmed, pending);
     }
 
-    private bool TryAcquire(string key, int max = MaxRequestsPerHour)
-    {
-        if (_limiters.Count > MaxTrackedKeys)
-        {
-            _limiters.Clear();
-        }
-
-        return _limiters.GetOrAdd(key, _ => new SlidingWindowRateLimiter(max, TimeSpan.FromHours(1))).TryAcquire(_now());
-    }
+    private bool TryAcquire(string key, int max = MaxRequestsPerHour) => _limiters.TryAcquire(key, max, _now());
 
     private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 

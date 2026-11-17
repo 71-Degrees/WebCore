@@ -108,7 +108,11 @@ public static class AccountRegistration
             ExposeCodeForDevelopment: isDevelopment,
             MaxPerClientPerHour: config.GetValue("AccountEmail:MaxPerClientPerHour", AccountEmailService.DefaultMaxPerClientPerHour),
             MaxPerHour: config.GetValue("AccountEmail:MaxPerHour", AccountEmailService.DefaultMaxPerHour),
-            MaxPerDay: config.GetValue("AccountEmail:MaxPerDay", AccountEmailService.DefaultMaxPerDay));
+            MaxPerDay: config.GetValue("AccountEmail:MaxPerDay", AccountEmailService.DefaultMaxPerDay))
+        {
+            ClearUnverifiedPassword = options.ClearUnverifiedPassword,
+            OnConfirmationRequested = options.OnConfirmationRequested,
+        };
     }
 
     /// <summary>The addresses in <c>Auth:AdminEmails</c> (comma-separated), lower-cased.</summary>

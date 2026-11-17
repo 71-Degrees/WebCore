@@ -185,6 +185,11 @@ public static class AccountEndpoints
                     return Results.Redirect(options.LoginPath + "?error=disabled" + common);
                 }
 
+                if (result.IsNewAccount)
+                {
+                    await bundle.SignupPolicy.AccountCreatedAsync(http, result.User!, form);
+                }
+
                 await signIn.SignInAsync(http, result.User!);
                 http.Response.Cookies.Delete(options.CodeClientCookieName);
                 return Results.LocalRedirect(returnUrl);

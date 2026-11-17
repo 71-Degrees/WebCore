@@ -15,19 +15,6 @@ namespace WebCore.Tests.Accounts;
 /// <summary>Changing, setting and resetting a password, and the emailed-code half of the reset.</summary>
 public class PasswordServiceTests : IDisposable
 {
-    private sealed class CapturingSender : IEmailSender
-    {
-        public List<(string To, string Subject, string Body)> Sent { get; } = new();
-
-        public Task SendAsync(string toEmail, string subject, string htmlBody, CancellationToken cancellationToken = default)
-        {
-            Sent.Add((toEmail, subject, htmlBody));
-            return Task.CompletedTask;
-        }
-
-        public string LastCode() => Regex.Match(Sent[^1].Body, @"<strong>(\d{6})</strong>").Groups[1].Value;
-    }
-
     private sealed class ThrowingSender : IEmailSender
     {
         public Task SendAsync(string toEmail, string subject, string htmlBody, CancellationToken cancellationToken = default) => throw new InvalidOperationException("smtp down");
