@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Primitives;
 using WebCore.Accounts;
 using WebCore.Email;
 using WebCore.Hosting.Accounts;
@@ -203,19 +204,86 @@ public sealed class AccountHostingTests : IDisposable
         public Task SignOutAsync(HttpContext context, string? scheme, AuthenticationProperties? properties) => Task.CompletedTask;
     }
 
+    private static HttpContext FromAddress(int n) => new DefaultHttpContext { Connection = { RemoteIpAddress = System.Net.IPAddress.Parse("10.0.0." + n) } };
+
     [Fact]
     public void PasswordGuessesAtOneAccount_AreCapped_FromAnyAddress()
     {
-        var limits = new AccountRateLimits();
-        static HttpContext From(int n) => new DefaultHttpContext { Connection = { RemoteIpAddress = System.Net.IPAddress.Parse("10.0.0." + n) } };
+        var limits = new AccountRateLimits(new AccountOptions());
 
         for (var i = 1; i <= 10; i++)
         {
-            Assert.True(limits.TryAcquirePassword(From(i), "sam@example.com"));
+            Assert.True(limits.TryAcquirePassword(FromAddress(i), "sam@example.com"));
         }
 
-        Assert.False(limits.TryAcquirePassword(From(11), " Sam@Example.com "));
-        Assert.True(limits.TryAcquirePassword(From(11), "other@example.com"));
+        Assert.False(limits.TryAcquirePassword(FromAddress(11), " Sam@Example.com "));
+        Assert.True(limits.TryAcquirePassword(FromAddress(11), "other@example.com"));
+    }
+
+    [Fact]
+    public void TheSharedCeiling_DefaultsTo60_AcrossAddresses()
+    {
+        var limits = new AccountRateLimits(new AccountOptions());
+
+        for (var i = 1; i <= 60; i++)
+        {
+            Assert.True(limits.TryAcquire(FromAddress(i)));
+        }
+
+        Assert.False(limits.TryAcquire(FromAddress(61)));
+    }
+
+    [Fact]
+    public void TheSharedCeiling_AndTheScale_AreReadFromOptions()
+    {
+        // Ceiling 2 times scale 3: six attempts across all addresses, then refused.
+        var limits = new AccountRateLimits(new AccountOptions { SharedAttemptCeiling = 2, AttemptScale = 3 });
+
+        for (var i = 1; i <= 6; i++)
+        {
+            Assert.True(limits.TryAcquire(FromAddress(i)));
+        }
+
+        Assert.False(limits.TryAcquire(FromAddress(7)));
+    }
+
+    [Fact]
+    public void TheAddressLimit_IsTenByDefault_AndTheScaleMultipliesIt()
+    {
+        var plain = new AccountRateLimits(new AccountOptions());
+        for (var i = 1; i <= 10; i++)
+        {
+            Assert.True(plain.TryAcquireAddress(FromAddress(1)));
+        }
+
+        Assert.False(plain.TryAcquireAddress(FromAddress(1)));
+        Assert.True(plain.TryAcquireAddress(FromAddress(2)));
+
+        var scaled = new AccountRateLimits(new AccountOptions { AttemptScale = 3 });
+        for (var i = 1; i <= 30; i++)
+        {
+            Assert.True(scaled.TryAcquireAddress(FromAddress(1)));
+        }
+
+        Assert.False(scaled.TryAcquireAddress(FromAddress(1)));
+    }
+
+    [Fact]
+    public void TheFailureQueryPart_DefaultsToNothing_AndAnAppCanKeepAnInviteCode()
+    {
+        var form = new FormCollection(new Dictionary<string, StringValues> { ["inviteCode"] = "BETA 1" });
+
+        Assert.Null(((IAccountSignupPolicy)new AllowAllSignups()).FailureQueryPart(form));
+        Assert.Equal("&invite=BETA%201", ((IAccountSignupPolicy)new KeepsInvite()).FailureQueryPart(form));
+    }
+
+    private sealed class KeepsInvite : IAccountSignupPolicy
+    {
+        public string? Refusal(HttpContext http, string email, string displayName) => null;
+
+        public Task AccountCreatedAsync(HttpContext http, User user, IFormCollection form) => Task.CompletedTask;
+
+        public string? FailureQueryPart(IFormCollection form) => "&invite=" + Uri.EscapeDataString(form["inviteCode"].ToString());
     }
 
     [Fact]

@@ -53,7 +53,8 @@ public static class AccountEndpoints
 
         IResult Fail(string reason) => Results.Redirect(
             $"{options.RegisterPath}?error={Uri.EscapeDataString(reason)}&returnUrl={Uri.EscapeDataString(returnUrl)}" +
-            $"{bundle.FormMemory.QueryPart(http, rawEmail.Trim())}&displayName={Uri.EscapeDataString(displayName)}");
+            $"{bundle.FormMemory.QueryPart(http, rawEmail.Trim())}&displayName={Uri.EscapeDataString(displayName)}" +
+            (bundle.SignupPolicy.FailureQueryPart(form) ?? string.Empty));
 
         var email = AccountEmailService.NormalizeEmail(rawEmail);
         if (email is null)
@@ -147,42 +148,47 @@ public static class AccountEndpoints
         return Results.LocalRedirect(returnUrl);
     }
 
-    private static async Task<IResult> SendSignInCodeAsync(HttpContext http, AccountEmailService accountEmail, AccountServicesBundle bundle)
+    private static async Task<IResult> SendSignInCodeAsync(HttpContext http, AccountEmailService accountEmail, AccountRateLimits limits, AccountServicesBundle bundle)
     {
         var options = bundle.Options;
         var form = await http.Request.ReadFormAsync();
-        var email = form["email"].ToString().Trim();
-        var returnUrl = LocalReturnUrl.Sanitize(form["returnUrl"].ToString());
+        var tail = CodeTail.Read(http, bundle, form["email"].ToString().Trim(), form);
+        if (AddressCodeLimit(http, limits, options.LoginPath, tail.Common) is { } limited)
+        {
+            return limited;
+        }
 
-        var result = await accountEmail.RequestSignInCodeAsync(email, CodeClient.KeyFor(http, options));
-        var common = $"{bundle.FormMemory.QueryPart(http, email)}&returnUrl={Uri.EscapeDataString(returnUrl)}";
+        var result = await accountEmail.RequestSignInCodeAsync(tail.Email, CodeClient.KeyFor(http, options));
         return result.Status == EmailRequestStatus.Sent
-            ? Results.Redirect(options.LoginPath + "?step=code" + common + DevCode(result))
-            : Results.Redirect(options.LoginPath + "?codeError=" + Code(result.Status) + common);
+            ? Results.Redirect(options.LoginPath + "?step=code" + tail.Common + DevCode(result))
+            : Results.Redirect(options.LoginPath + "?codeError=" + Code(result.Status) + tail.Common);
     }
 
-    private static async Task<IResult> VerifySignInCodeAsync(HttpContext http, AccountEmailService accountEmail, IUserProfileRepository profiles, AccountServicesBundle bundle)
+    private static async Task<IResult> VerifySignInCodeAsync(HttpContext http, AccountEmailService accountEmail, IUserProfileRepository profiles, AccountRateLimits limits, AccountServicesBundle bundle)
     {
         var options = bundle.Options;
         var signIn = bundle.SignIn;
         var form = await http.Request.ReadFormAsync();
         var email = (form["email"].ToString() is { Length: > 0 } typed ? typed : bundle.FormMemory.Recall(http) ?? string.Empty).Trim();
-        var returnUrl = LocalReturnUrl.Sanitize(form["returnUrl"].ToString());
-        var common = $"{bundle.FormMemory.QueryPart(http, email)}&returnUrl={Uri.EscapeDataString(returnUrl)}";
+        var tail = CodeTail.Read(http, bundle, email, form);
+        if (AddressCodeLimit(http, limits, options.LoginPath, tail.Common) is { } limited)
+        {
+            return limited;
+        }
 
         var clientKey = http.Request.Cookies[options.CodeClientCookieName];
         if (string.IsNullOrWhiteSpace(clientKey))
         {
-            return Results.Redirect(options.LoginPath + "?codeError=expired" + common);
+            return Results.Redirect(options.LoginPath + "?codeError=expired" + tail.Common);
         }
 
-        var result = await accountEmail.ConfirmSignInAsync(email, clientKey, form["code"].ToString(), form["displayName"].ToString());
+        var result = await accountEmail.ConfirmSignInAsync(tail.Email, clientKey, form["code"].ToString(), form["displayName"].ToString());
         switch (result.Status)
         {
             case CodeCheckStatus.Confirmed:
                 if ((await profiles.GetAsync(result.User!.Id)) is { IsDisabled: true })
                 {
-                    return Results.Redirect(options.LoginPath + "?error=disabled" + common);
+                    return Results.Redirect(options.LoginPath + "?error=disabled" + tail.Common);
                 }
 
                 if (result.IsNewAccount)
@@ -192,11 +198,11 @@ public static class AccountEndpoints
 
                 await signIn.SignInAsync(http, result.User!);
                 http.Response.Cookies.Delete(options.CodeClientCookieName);
-                return Results.LocalRedirect(returnUrl);
+                return Results.LocalRedirect(tail.ReturnUrl);
             case CodeCheckStatus.UsePassword:
-                return Results.Redirect(options.LoginPath + "?error=usepassword" + common);
+                return Results.Redirect(options.LoginPath + "?error=usepassword" + tail.Common);
             default:
-                return Results.Redirect(options.LoginPath + "?codeError=" + Code(result.Status) + KeepCodeOpen(result.Status) + common);
+                return Results.Redirect(options.LoginPath + "?codeError=" + Code(result.Status) + KeepCodeOpen(result.Status) + tail.Common);
         }
     }
 
@@ -258,6 +264,22 @@ public static class AccountEndpoints
     internal static string KeepCodeOpen(CodeCheckStatus status) => status == CodeCheckStatus.WrongCode ? "&step=code" : string.Empty;
 
     internal static string DevCode(EmailRequestResult result) => result.DevCode is null ? string.Empty : "&devCode=" + result.DevCode;
+
+    /// <summary>A code request (a send, a check, a reset) spends this address's allowance before anything else. Null when it may go on; otherwise the redirect
+    /// back to the page that asked, with the answer every rate-limited code request gets.</summary>
+    internal static IResult? AddressCodeLimit(HttpContext http, AccountRateLimits limits, string page, string common) =>
+        limits.TryAcquireAddress(http) ? null : Results.Redirect(page + "?codeError=ratelimited" + common);
+}
+
+/// <summary>What every emailed-code form has in common: the email it names, and the query tail (the email, kept out of the URL when the app asks, and the
+/// return address) that carries both across each redirect back to the login page.</summary>
+internal sealed record CodeTail(string Email, string ReturnUrl, string Common)
+{
+    public static CodeTail Read(HttpContext http, AccountServicesBundle bundle, string email, IFormCollection form)
+    {
+        var returnUrl = LocalReturnUrl.Sanitize(form["returnUrl"].ToString());
+        return new CodeTail(email, returnUrl, $"{bundle.FormMemory.QueryPart(http, email)}&returnUrl={Uri.EscapeDataString(returnUrl)}");
+    }
 }
 
 /// <summary>The services several account handlers share, so a handler's parameter list stays short (one request-scoped bundle, not six injections).</summary>

@@ -23,6 +23,10 @@ public interface IAccountSignupPolicy
     /// (the account that code made). The app can record what it keeps of the signup (the address it came from) or grant a role from the form (an invite
     /// code); it saves what it changes itself.</summary>
     Task AccountCreatedAsync(HttpContext http, User user, IFormCollection form);
+
+    /// <summary>Extra query text for a failed password signup's redirect back to the form, for example <c>&amp;invite=...</c> so a typed invite code is kept.
+    /// It must begin with <c>&amp;</c> and be encoded by the app; null, the default, adds nothing.</summary>
+    string? FailureQueryPart(IFormCollection form) => null;
 }
 
 /// <summary>The default signup policy: everyone may register, and nothing more happens.</summary>

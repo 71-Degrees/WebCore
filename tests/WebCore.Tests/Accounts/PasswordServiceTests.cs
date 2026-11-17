@@ -20,6 +20,25 @@ public class PasswordServiceTests : IDisposable
         public Task SendAsync(string toEmail, string subject, string htmlBody, CancellationToken cancellationToken = default) => throw new InvalidOperationException("smtp down");
     }
 
+    /// <summary>An account store whose saves fail, as a storage outage does; reads pass through.</summary>
+    private sealed class FailingSaves(IUserRepository inner) : IUserRepository
+    {
+        public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default) => inner.GetByEmailAsync(email, cancellationToken);
+
+        public Task<User?> GetByIdAsync(string id, CancellationToken cancellationToken = default) => inner.GetByIdAsync(id, cancellationToken);
+
+        public Task<IReadOnlyList<User>> ListAsync(CancellationToken cancellationToken = default) => inner.ListAsync(cancellationToken);
+
+        public Task SaveAsync(User user, CancellationToken cancellationToken = default) => throw new InvalidOperationException("storage down");
+
+        public Task ChangeEmailAsync(User user, string newEmail, CancellationToken cancellationToken = default) => inner.ChangeEmailAsync(user, newEmail, cancellationToken);
+
+        public Task<User> CreateAsync(User user, CancellationToken cancellationToken = default) => inner.CreateAsync(user, cancellationToken);
+    }
+
+    // A hash stored with fewer iterations than today's: it still verifies, and is due an upgrade at the next sign-in.
+    private const string LegacyHash = "100000.c2FsdHNhbHRzYWx0c2FsdA==.a2V5a2V5a2V5a2V5a2V5a2V5a2V5a2V5";
+
     private const string OldPassword = "old-password-1";
     private const string NewPassword = "new-password-2";
 
@@ -242,6 +261,36 @@ public class PasswordServiceTests : IDisposable
         var signIn = await codes.ConfirmSignInAsync("sam@example.com", "browser-1", _sender.LastCode());
 
         Assert.Equal(CodeCheckStatus.Expired, signIn.Status);
+    }
+
+    [Fact]
+    public async Task AnOldHash_IsUpgradedAtSignIn_AndTheSamePasswordStillWorks()
+    {
+        var user = await UserAsync(OldPassword);
+        user.PasswordHash = LegacyHash;
+        await _users.SaveAsync(user);
+
+        await Passwords().UpgradeHashIfNeededAsync(user, OldPassword);
+
+        var stored = (await _users.GetByIdAsync(user.Id))!.PasswordHash;
+        Assert.False(PasswordHasher.NeedsRehash(stored));
+        Assert.True(await PasswordIsAsync(user, OldPassword));
+        Assert.Empty(_sender.Sent);
+    }
+
+    [Fact]
+    public async Task AFailedHashUpgrade_IsReported_AndNeverStopsTheSignIn()
+    {
+        var user = await UserAsync(OldPassword);
+        user.PasswordHash = LegacyHash;
+        await _users.SaveAsync(user);
+        Exception? reported = null;
+        var failing = new PasswordService(new FailingSaves(_users), _sender, new AccountEmailOptions("Better Trivia", true), onSendFailure: ex => reported = ex);
+
+        await failing.UpgradeHashIfNeededAsync(user, OldPassword);
+
+        Assert.NotNull(reported);
+        Assert.Equal(LegacyHash, (await _users.GetByIdAsync(user.Id))!.PasswordHash);
     }
 
     [Theory]

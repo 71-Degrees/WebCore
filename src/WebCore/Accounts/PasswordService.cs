@@ -102,7 +102,8 @@ public sealed class PasswordService
         ApplyAsync(user, newPassword, confirmation, cancellationToken);
 
     /// <summary>After a successful password sign-in: re-hashes a password stored with fewer iterations than today's (<see cref="PasswordHasher.NeedsRehash"/>).
-    /// The password itself is unchanged, so the security stamp is kept and no notice is sent.</summary>
+    /// The password itself is unchanged, so the security stamp is kept and no notice is sent. A failed upgrade never stops the sign-in: the old hash still
+    /// verifies, and the upgrade is tried again at the next sign-in.</summary>
     public async Task UpgradeHashIfNeededAsync(User user, string password, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(user.PasswordHash) || !PasswordHasher.NeedsRehash(user.PasswordHash))
@@ -110,8 +111,15 @@ public sealed class PasswordService
             return;
         }
 
-        user.PasswordHash = PasswordHasher.Hash(password);
-        await _users.SaveAsync(user, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            user.PasswordHash = PasswordHasher.Hash(password);
+            await _users.SaveAsync(user, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _onSendFailure?.Invoke(ex);
+        }
     }
 
     private async Task<User?> FindAsync(string? userId, CancellationToken cancellationToken) =>

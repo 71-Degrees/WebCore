@@ -81,6 +81,15 @@ public sealed class AccountOptions
     /// Null, the default, records nothing (see <see cref="AccountEmailOptions.OnConfirmationRequested"/>).</summary>
     public Action<User, EmailRequestStatus>? OnConfirmationRequested { get; set; }
 
+    /// <summary>The shared ceiling on registrations and password attempts per 10 minutes, across every address. The per-address and per-account limits are
+    /// the real protection; this is a backstop against a mass attack. Default 60 (what every app had before the module). An app with a real audience may
+    /// raise it so a few noisy clients cannot lock everyone out.</summary>
+    public int SharedAttemptCeiling { get; set; } = 60;
+
+    /// <summary>Multiplies every attempt limit (the shared ceiling and the per-address and per-account ones). Default 1 (production). A development machine
+    /// sets it higher, because its browser tests all come from one address and would otherwise lock themselves out.</summary>
+    public int AttemptScale { get; set; } = 1;
+
     internal void Validate()
     {
         if (Roles is null || UsersStore is null || ProfilesStore is null || string.IsNullOrWhiteSpace(BrandName))

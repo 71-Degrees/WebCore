@@ -18,13 +18,18 @@ internal static class PasswordEndpoints
         forms.MapPost("/account/password-change", ChangeAsync).RequireAuthorization();
     }
 
-    private static async Task<IResult> SendResetCodeAsync(HttpContext http, AccountEmailService accountEmail, AccountServicesBundle bundle)
+    private static async Task<IResult> SendResetCodeAsync(HttpContext http, AccountEmailService accountEmail, AccountRateLimits limits, AccountServicesBundle bundle)
     {
         var options = bundle.Options;
         var form = await http.Request.ReadFormAsync();
         var email = form["email"].ToString().Trim();
-        var result = await accountEmail.RequestPasswordResetAsync(email, CodeClient.KeyFor(http, options));
         var common = bundle.FormMemory.QueryPart(http, email);
+        if (AccountEndpoints.AddressCodeLimit(http, limits, options.ForgotPasswordPath, common) is { } limited)
+        {
+            return limited;
+        }
+
+        var result = await accountEmail.RequestPasswordResetAsync(email, CodeClient.KeyFor(http, options));
         return result.Status == EmailRequestStatus.Sent
             ? Results.Redirect(options.ForgotPasswordPath + "?step=code" + common + AccountEndpoints.DevCode(result))
             : Results.Redirect(options.ForgotPasswordPath + "?codeError=" + AccountEndpoints.Code(result.Status) + common);

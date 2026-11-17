@@ -67,7 +67,7 @@ public static class AccountRegistration
             sp.GetRequiredService<IEmailSender>(),
             emailOptions,
             sp.GetService<TimeProvider>(),
-            ex => Log(sp, options).LogWarning(ex, "Could not send a password-changed notice")));
+            ex => Log(sp, options).LogWarning(ex, "A password side effect failed: a changed-password notice was not sent, or a password hash was not upgraded")));
 
         services.AddSingleton<AccountRateLimits>();
         services.AddSingleton<AccountSignIn>();

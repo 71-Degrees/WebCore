@@ -53,16 +53,19 @@ public sealed class AccountSignIn(IUserProfileRepository profiles, AccountClaims
 /// </summary>
 public sealed class AccountRateLimits
 {
-    // The shared ceiling every app had before the module (60 per 10 minutes); the per-address and per-account limits are the real protection.
-    private const int SharedCeiling = 60;
+    private readonly AccountAttemptLimiter _limits;
 
-    private readonly AccountAttemptLimiter _limits = new(globalMax: SharedCeiling);
+    public AccountRateLimits(AccountOptions options) =>
+        _limits = new AccountAttemptLimiter(scale: options.AttemptScale, globalMax: options.SharedAttemptCeiling);
 
     /// <summary>An attempt that names no existing password (a registration, a reset by emailed code): this address's allowance, then the shared ceiling.</summary>
     public bool TryAcquire(HttpContext http) => _limits.TryAcquire(Address(http));
 
     /// <summary>An attempt at <paramref name="email"/>'s password (a sign-in, a password change): that account's allowance, then this address's, then the shared ceiling.</summary>
     public bool TryAcquirePassword(HttpContext http, string email) => _limits.TryAcquireLogin(Address(http), email);
+
+    /// <summary>A request for an emailed code (a send, a check) or a reset: only this address's allowance. The code service has its own per-email limits behind it.</summary>
+    public bool TryAcquireAddress(HttpContext http) => _limits.TryAcquireAddress(Address(http));
 
     // Requests with no address (an in-memory test host) share one allowance.
     private static string Address(HttpContext http) => http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
