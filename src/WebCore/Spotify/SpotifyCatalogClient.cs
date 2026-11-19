@@ -353,8 +353,19 @@ public sealed class SpotifyCatalogClient : IAlbumMetadataSource, IDisposable
             AlbumType = type,
             CoverUrl = LargestImage(element),
             Upc = element.TryGetProperty("external_ids", out var ids) ? Text(ids, "upc") : null,
+            Genre = FirstGenre(element),
+            ReleaseDate = MetadataDates.FullDate(Text(element, "release_date")),
+            TrackCount = Count(element, "total_tracks"),
         };
     }
+
+    private static string? FirstGenre(JsonElement album) =>
+        album.TryGetProperty("genres", out var genres) && genres.ValueKind == JsonValueKind.Array && genres.GetArrayLength() > 0 && genres[0].ValueKind == JsonValueKind.String
+            ? genres[0].GetString()
+            : null;
+
+    private static int? Count(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var count) ? count : null;
 
     private static MetadataArtist? FirstArtist(JsonElement album) =>
         album.TryGetProperty("artists", out var artists) && artists.ValueKind == JsonValueKind.Array && artists.GetArrayLength() > 0

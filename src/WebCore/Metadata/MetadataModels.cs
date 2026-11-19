@@ -4,6 +4,8 @@
  * ---------------------------------------------------------------------------
  */
 
+using System.Globalization;
+
 namespace WebCore.Metadata;
 
 /// <summary>How a metadata call ended: Ok with data; NotFound (nothing matched); Busy (refused or slow for now, or held back); Failed (anything else).</summary>
@@ -37,7 +39,31 @@ public sealed record MetadataAlbum
     public string? CoverUrl { get; init; }
 
     public string? Upc { get; init; }
+
+    /// <summary>The first genre the service gives the album (iTunes primary genre, Spotify's first genre); null when it gives none.</summary>
+    public string? Genre { get; init; }
+
+    /// <summary>The full release date as yyyy-MM-dd, when the service gives a whole date; null for a year or month alone.</summary>
+    public string? ReleaseDate { get; init; }
+
+    /// <summary>How many tracks the album has, when the service says.</summary>
+    public int? TrackCount { get; init; }
 }
 
 /// <summary>One artist as a search gives it.</summary>
 public sealed record MetadataArtist(string Id, string Name);
+
+/// <summary>Release dates as the services write them, reduced to the one form the catalog keeps.</summary>
+public static class MetadataDates
+{
+    /// <summary>The whole date of a release as yyyy-MM-dd, from "1992-05-12" or "1992-05-12T07:00:00Z"; null when only a year or month is given, or none.</summary>
+    public static string? FullDate(string? date)
+    {
+        if (date is not { Length: >= 10 } || !DateOnly.TryParseExact(date.AsSpan(0, 10), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+        {
+            return null;
+        }
+
+        return day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    }
+}

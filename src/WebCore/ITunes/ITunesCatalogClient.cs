@@ -51,8 +51,17 @@ public sealed class ITunesCatalogClient : IAlbumMetadataSource
     {
         ArgumentNullException.ThrowIfNull(upc);
         return upc.Length > 0 && upc.All(char.IsAsciiDigit)
-            ? AlbumsAsync(LookupUrl + "upc=" + upc + "&entity=album", cancellationToken)
+            ? AlbumsByUpcAsync(upc, cancellationToken)
             : Task.FromResult(new MetadataResult<IReadOnlyList<MetadataAlbum>>(MetadataStatus.NotFound));
+    }
+
+    // A lookup by UPC answers the album with that UPC, so the barcode is the album's UPC as iTunes gives it.
+    private async Task<MetadataResult<IReadOnlyList<MetadataAlbum>>> AlbumsByUpcAsync(string upc, CancellationToken cancellationToken)
+    {
+        var result = await AlbumsAsync(LookupUrl + "upc=" + upc + "&entity=album", cancellationToken).ConfigureAwait(false);
+        return result.Status != MetadataStatus.Ok
+            ? result
+            : new MetadataResult<IReadOnlyList<MetadataAlbum>>(MetadataStatus.Ok, result.Data!.Select(album => album with { Upc = upc }).ToList());
     }
 
     public async Task<MetadataResult<IReadOnlyList<MetadataArtist>>> SearchArtistAsync(string name, CancellationToken cancellationToken = default)
@@ -209,8 +218,14 @@ public sealed class ITunesCatalogClient : IAlbumMetadataSource
             ReleaseYear = ReleaseYear(Text(element, "releaseDate")),
             AlbumType = "album",
             CoverUrl = LargeCover(Text(element, "artworkUrl100")),
+            Genre = Text(element, "primaryGenreName"),
+            ReleaseDate = MetadataDates.FullDate(Text(element, "releaseDate")),
+            TrackCount = Count(element, "trackCount"),
         };
     }
+
+    private static int? Count(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var count) ? count : null;
 
     private static string? LargeCover(string? url) => url?.Replace(SmallArt, LargeArt, StringComparison.Ordinal);
 
