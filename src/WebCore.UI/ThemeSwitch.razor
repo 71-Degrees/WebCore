@@ -1,0 +1,12 @@
+@*
+    ---------------------------------------------------------------------------
+    Copyright © 2026 71 Degrees. All rights reserved.
+    ---------------------------------------------------------------------------
+*@
+
+@* The visitor's colour theme: three buttons, wired by wwwroot/theme.js (docs/theme.md). Presentational only: the script does the work, so the page works without it, showing three buttons that change nothing. Styling comes from the app's own CSS tokens (the .wc-theme-* rules in docs/theme.md). *@
+<div class="wc-theme" role="group" aria-label="Colour theme">
+    <button type="button" class="wc-theme-button" data-theme-choice="system" aria-pressed="false">System</button>
+    <button type="button" class="wc-theme-button" data-theme-choice="light" aria-pressed="false">Light</button>
+    <button type="button" class="wc-theme-button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+</div>

@@ -1,0 +1,133 @@
+# Colour theme: System, Light, Dark
+
+WebCore gives every app the same visitor choice of colour theme: the page follows the operating system (System), or is forced to Light or Dark. The
+choice is kept in the browser's `localStorage` under the key `theme`. It is **per browser, not per account**: a visitor who signs in on a second computer
+chooses again there.
+
+Files: `src/WebCore.UI/wwwroot/theme.js` (served as `_content/WebCore.UI/theme.js`) and `src/WebCore.UI/ThemeSwitch.razor`.
+
+## 1. Colours are tokens, defined once per selector
+
+Every colour on the page is a custom property on `:root`, with the light values. The dark values are written twice, once per selector, because a media
+query cannot share a block with an attribute selector. Keep the two dark blocks identical:
+
+```css
+:root {
+    --app-bg: #f4ecdc;
+    --app-text: #2a211b;
+    /* ...every other token, light values... */
+    color-scheme: light;
+}
+
+/* Follows the system, unless the visitor chose Light. */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --app-bg: #17120f;
+        --app-text: #efe4cf;
+        /* ...the same dark values, token for token... */
+        color-scheme: dark;
+    }
+}
+
+/* The visitor chose Dark. */
+:root[data-theme="dark"] {
+    --app-bg: #17120f;
+    --app-text: #efe4cf;
+    /* ...the same dark values, token for token... */
+    color-scheme: dark;
+}
+
+body {
+    background: var(--app-bg);   /* an explicit background from a token, never left to the browser */
+    color: var(--app-text);
+}
+```
+
+Rules that follow from this:
+
+- The `light` choice sets `data-theme="light"`, which the media query excludes, so Light wins over a dark system. The `:root` block carries `color-scheme: light`.
+- The `system` choice removes the attribute, so the media query alone decides.
+- Never test `prefers-color-scheme` anywhere else in the app's CSS. Use the tokens. A place that hard-codes a light colour (`white`, `#fff` on a card) breaks Dark.
+- Contrast: text pairs stay at 4.5:1 or better in both palettes.
+
+## 2. Load `theme.js` in `<head>`, synchronously
+
+The site's Content-Security-Policy forbids inline scripts, so the script is an external file. It must be a plain `<script src>` in `<head>`, **without**
+`defer` or `async`, so the saved theme is applied before the first paint:
+
+```html
+<head>
+    <meta charset="utf-8" />
+    <script src="@Assets["_content/WebCore.UI/theme.js"]"></script>
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    ...
+</head>
+```
+
+Pass the path through `@Assets` like every other static file (including `_content/<library>/...` files), so it is fingerprinted and a phone never keeps a
+stale copy. Put the script before the stylesheet.
+
+## 3. Place the switch
+
+```razor
+<footer class="app-footer">
+    <span class="app-muted">Theme:</span>
+    <ThemeSwitch />
+    ...
+</footer>
+```
+
+`ThemeSwitch` renders `<div class="wc-theme" role="group" aria-label="Colour theme">` with three `<button data-theme-choice="system|light|dark">`
+labelled System, Light and Dark. `theme.js` marks the active one with `aria-pressed="true"` and keeps every open tab in step.
+
+## 4. The switch's CSS (add to the app's stylesheet, using its tokens)
+
+The component ships no stylesheet of its own: each app styles it with its tokens, so it takes the app's palette. Paste this block and change the
+token names to the app's own (the fallbacks keep it readable if a token is missing):
+
+```css
+/* Colour theme switch (WebCore ThemeSwitch). */
+.wc-theme {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.wc-theme-button {
+    min-height: 44px;            /* a phone touch target */
+    min-width: 44px;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid var(--app-border, #d9dde3);
+    border-radius: 2px;
+    background: var(--app-panel, #ffffff);
+    color: var(--app-text, #1d2330);
+    font: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.wc-theme-button[aria-pressed="true"] {
+    background: var(--app-accent, #1f6feb);
+    border-color: var(--app-accent, #1f6feb);
+    color: var(--app-accent-text, #ffffff);
+}
+
+.wc-theme-button:focus-visible {
+    outline: 3px solid var(--app-focus, #1f6feb);
+    outline-offset: 2px;
+}
+```
+
+## 5. What the visitor sees
+
+- A first visit has no saved choice, so the page follows the system (the browser's own setting decides).
+- Clicking a button applies the theme at once and saves it. Reloading keeps it. A second open tab changes with it.
+- If storage is blocked (private browsing, site data disabled), the choice still applies to the page until it is closed; nothing breaks.
+
+## 6. Checks before an app ships the switch
+
+- Load the page with the system in light and in dark, then click each button: the page, the cards, the form fields, the native controls (`color-scheme`)
+  and the focus rings change, with no light-only colour left.
+- Two tabs on the same origin agree after a click.
+- The footer row wraps on a 360 px wide phone and does not push the page's main content sideways.
