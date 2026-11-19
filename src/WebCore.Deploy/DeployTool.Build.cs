@@ -88,7 +88,10 @@ internal static partial class DeployTool
             return (zip, version);
         }
 
-        return PublishAndZip(root, version, zip, options) ? (zip, version) : null;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var built = PublishAndZip(root, version, zip, options);
+        Console.WriteLine($"Build and zip took {clock.Elapsed.TotalSeconds:F0} s.");
+        return built ? (zip, version) : null;
     }
 
     /// <summary>A build must be of a commit whose tests pass, so the tests run first (--skip-tests overrides) and uncommitted changes under src/ stop it (--allow-dirty overrides).</summary>

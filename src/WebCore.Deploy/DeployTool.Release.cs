@@ -223,12 +223,15 @@ internal static partial class DeployTool
 
     private static async Task<int> PushCoreAsync((string Name, Target Target, Options Options) t, DeployState state, string zip, string version, bool isRollback)
     {
+        // Phase timings are printed so a slow deploy shows where the time went (upload to Azure, or the site coming back) instead of being guessed at.
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         if (await UploadAsync(t, zip, version) is { } failed)
         {
             return failed;
         }
 
-        Console.WriteLine("Uploaded. Waiting for the new build to answer...");
+        var uploadSeconds = clock.Elapsed.TotalSeconds;
+        Console.WriteLine($"Uploaded in {uploadSeconds:F0} s ({new FileInfo(zip).Length / 1048576.0:F1} MB). Waiting for the new build to answer...");
         if (!await WaitForBuildAsync(t.Target, version))
         {
             Console.Error.WriteLine($"The new build did not report version {version} within 5 minutes. Check {t.Target.Url}{Config.Endpoints.Version} and the Azure log stream; 'rollback {t.Name}' restores the previous build.");
@@ -241,6 +244,7 @@ internal static partial class DeployTool
             state.Previous[t.Name] = before;
         }
 
+        Console.WriteLine($"The new build answered {clock.Elapsed.TotalSeconds - uploadSeconds:F0} s after the upload finished ({clock.Elapsed.TotalSeconds:F0} s upload and restart in all).");
         state.Current[t.Name] = new DeployedBuild(version, zip, DateTimeOffset.UtcNow);
         SaveState(state);
         await AfterDeployAsync(t, version, isRollback);
