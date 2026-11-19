@@ -78,6 +78,15 @@
   // Blazor can add the switch after load, so the states are re-read whenever nodes are added.
   new MutationObserver(sync).observe(document.documentElement, { childList: true, subtree: true });
 
+  // Blazor's enhanced navigation patches the page in place, <html> attributes included, and the new page's html has no data-theme: the saved choice is put back the moment
+  // the attribute drifts from it, so the theme holds from page to page without a refresh. Setting the attribute to what it should already be changes nothing, so no loop.
+  const holdChoice = () => {
+    const wanted = readChoice();
+    const actual = document.documentElement.dataset.theme;
+    if ((wanted === 'system' ? undefined : wanted) !== actual) apply(wanted);
+  };
+  new MutationObserver(holdChoice).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
   apply(readChoice());
   document.addEventListener('DOMContentLoaded', sync);
 })();
