@@ -39,13 +39,18 @@ public static class FormAntiforgery
             catch (AntiforgeryValidationException ex)
             {
                 Refused(http, "antiforgery token invalid: " + ex.Message);
-                return Results.BadRequest("Invalid request.");
+                return StaleSignInForm(http) ? Results.LocalRedirect("/") : Results.BadRequest("Invalid request.");
             }
 
             return await next(context);
         });
         return group;
     }
+
+    // A sign-in form loaded while signed out and posted after the visitor signed in (a retry on a stale page, or after an admin masquerade) carries a token for the
+    // anonymous user. The visitor is already signed in, so they go home instead of seeing "Invalid request."
+    private static bool StaleSignInForm(HttpContext http) =>
+        http.User.Identity?.IsAuthenticated == true && http.Request.Path.StartsWithSegments("/account/login-submit");
 
     // The visitor only sees "Invalid request."; the log says why, because a refused phone upload is otherwise invisible (a 400 with no reason in telemetry).
     private static void Refused(HttpContext http, string reason) =>
