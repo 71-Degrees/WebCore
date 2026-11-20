@@ -69,16 +69,22 @@ stale copy. Put the script before the stylesheet.
 
 ## 3. Place the switch
 
+The switch belongs in the header, where it is always on screen, next to the brand and the account links (CrateDigger does this):
+
 ```razor
-<footer class="app-footer">
-    <span class="app-muted">Theme:</span>
-    <ThemeSwitch />
-    ...
-</footer>
+<header class="app-header">
+    <span class="app-brand-lockup">...</span>
+    <span class="app-header-end">
+        <ThemeSwitch />
+        <AccountNav />
+    </span>
+</header>
 ```
 
-`ThemeSwitch` renders `<div class="wc-theme" role="group" aria-label="Colour theme">` with three `<button data-theme-choice="system|light|dark">`
-labelled System, Light and Dark. `theme.js` marks the active one with `aria-pressed="true"` and keeps every open tab in step.
+`ThemeSwitch` renders a three-position rocker: `<div class="wc-theme" role="group" aria-label="Colour theme">` with three buttons,
+`data-theme-choice="light"` (a sun, "Light theme"), `data-theme-choice="system"` (a half-filled circle, "Match system", the middle "Auto" position)
+and `data-theme-choice="dark"` (a moon, "Dark theme"). `theme.js` marks the active one with `aria-pressed="true"` and keeps every open tab in step.
+The control has no text, so its accessible names carry the meaning; each button's hit area is at least 44 px square.
 
 ## 4. The switch's CSS (add to the app's stylesheet, using its tokens)
 
@@ -86,36 +92,47 @@ The component ships no stylesheet of its own: each app styles it with its tokens
 token names to the app's own (the fallbacks keep it readable if a token is missing):
 
 ```css
-/* Colour theme switch (WebCore ThemeSwitch). */
+/* Colour theme rocker (WebCore ThemeSwitch): sun | Auto | moon. The visible segments are 32 px tall; the button is 44 px square so it stays a phone
+   touch target, and the rocker keeps its look at any size. Pressed = the lit segment, inverted like a rocker switch. */
 .wc-theme {
+    position: relative;
     display: inline-flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.25rem;
+    align-items: stretch;
+    flex: none;
+    border: 1px solid var(--app-border, #3d3129);
+    border-radius: 999px;
+    background: var(--app-stock, #211a16);
+    overflow: hidden;
 }
 
 .wc-theme-button {
-    min-height: 44px;            /* a phone touch target */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
     min-width: 44px;
-    padding: 0.35rem 0.75rem;
-    border: 1px solid var(--app-border, #d9dde3);
-    border-radius: 2px;
-    background: var(--app-panel, #ffffff);
-    color: var(--app-text, #1d2330);
-    font: inherit;
-    font-size: 0.9rem;
+    min-height: 44px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--app-muted, #b8a890);
     cursor: pointer;
 }
 
+/* The Auto segment sits between the sun and the moon; a hairline divides it from each end. */
+.wc-theme-auto { border-left: 1px solid var(--app-border, #3d3129); border-right: 1px solid var(--app-border, #3d3129); }
+
 .wc-theme-button[aria-pressed="true"] {
-    background: var(--app-accent, #1f6feb);
-    border-color: var(--app-accent, #1f6feb);
-    color: var(--app-accent-text, #ffffff);
+    background: var(--app-ink, #efe4cf);
+    color: var(--app-paper, #17120f);
 }
 
+.wc-theme-button:hover:not([aria-pressed="true"]) { color: var(--app-ink, #efe4cf); }
+
 .wc-theme-button:focus-visible {
-    outline: 3px solid var(--app-focus, #1f6feb);
-    outline-offset: 2px;
+    outline: 3px solid var(--app-focus, #e8b65a);
+    outline-offset: -3px;
 }
 ```
 
@@ -130,4 +147,5 @@ token names to the app's own (the fallbacks keep it readable if a token is missi
 - Load the page with the system in light and in dark, then click each button: the page, the cards, the form fields, the native controls (`color-scheme`)
   and the focus rings change, with no light-only colour left.
 - Two tabs on the same origin agree after a click.
-- The footer row wraps on a 360 px wide phone and does not push the page's main content sideways.
+- The header row (brand, rocker, account links) wraps on a 360 px wide phone and does not push the page's main content sideways.
+- The rocker's three positions read correctly with no text: Light is lit under light, Dark under dark, Auto under system.
