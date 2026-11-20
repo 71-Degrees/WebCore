@@ -224,6 +224,11 @@ internal static partial class DeployTool
     private static async Task<int> PushCoreAsync((string Name, Target Target, Options Options) t, DeployState state, string zip, string version, bool isRollback)
     {
         // Phase timings are printed so a slow deploy shows where the time went (upload to Azure, or the site coming back) instead of being guessed at.
+        if (!t.Options.Flag("--no-load-check"))
+        {
+            await HostLoadCheck.ReportAndSettleAsync(t.Target);
+        }
+
         var clock = System.Diagnostics.Stopwatch.StartNew();
         if (await UploadAsync(t, zip, version) is { } failed)
         {

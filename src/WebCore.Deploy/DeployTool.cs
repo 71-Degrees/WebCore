@@ -12,6 +12,7 @@
 //   deploy build
 //   deploy stage [--wait [minutes]] [--interrupt N] [--offline-page]   # build (or --zip) and deploy to staging
 //   deploy prod  [--wait [minutes]] [--interrupt N]                     # promote the build that is on staging
+//   (stage and prod read the App Service plan's CPU and memory before the upload and wait up to 3 minutes while the host is saturated; --no-load-check skips it)
 //   deploy rollback <stage|prod>
 //   deploy notice <stage|prod> --at "2026-10-03 22:00" [--duration 10] --message "..." [--notify] [--dry-run] [--test-to me@x.com]
 //   deploy notice-clear <stage|prod>
