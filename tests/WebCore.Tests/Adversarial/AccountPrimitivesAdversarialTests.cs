@@ -132,17 +132,19 @@ public sealed class AccountPrimitivesAdversarialTests
         Assert.Throws<ArgumentNullException>(() => PasswordHasher.Verify(null!, hash));
     }
 
-    [Fact]
-    public void PasswordHasher_VerifyWithNullHash_ThrowsRatherThanReturningFalse_Finding()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void PasswordHasher_VerifyWithNullOrEmptyHash_IsFalse(string? hash)
     {
         // A null stored hash (a user row with no password column) should answer false like every other malformed hash.
-        Assert.Throws<NullReferenceException>(() => PasswordHasher.Verify("anything", null!));
+        Assert.False(PasswordHasher.Verify("anything", hash!));
     }
 
-    [Theory(Skip = "FINDING F-A1: zero/negative iteration count throws ArgumentOutOfRange instead of returning false")]
+    [Theory]
     [InlineData("-1.AAAAAAAAAAAAAAAAAAAAAA==.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")]
     [InlineData("0.AAAAAAAAAAAAAAAAAAAAAA==.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")]
-    public void PasswordHasher_NonPositiveIterationCount_IsRefusedNotThrown_Finding(string hash)
+    public void PasswordHasher_NonPositiveIterationCount_IsRefusedNotThrown(string hash)
     {
         // A tampered or corrupted row with zero or negative iterations makes PBKDF2 throw an ArgumentOutOfRangeException
         // instead of answering false, so one bad row becomes an unhandled error on sign-in.
@@ -161,12 +163,34 @@ public sealed class AccountPrimitivesAdversarialTests
         Assert.False(PasswordHasher.Verify("anything", hash));
     }
 
-    [Fact(Skip = "FINDING F-A2 (security): a hash with an empty key verifies ANY password as true")]
-    public void PasswordHasher_EmptyKeyPart_IsFalse_Finding()
+    [Fact]
+    public void PasswordHasher_EmptyKeyPart_IsFalse()
     {
         // "600000.<salt>." has an empty key: PBKDF2 returns zero bytes and FixedTimeEquals(empty, empty) is true.
         // Needs write access to the user store to plant such a row, but then every account with it signs in with any password.
         Assert.False(PasswordHasher.Verify("anything", "600000.AAAAAAAAAAAAAAAAAAAAAA==."));
+    }
+
+    [Fact]
+    public void PasswordHasher_HugeIterationCount_IsFalseWithoutHashing()
+    {
+        // 2147483647 iterations would hold one sign-in for hours; the upper bound refuses it before PBKDF2 is called.
+        Assert.False(PasswordHasher.Verify("anything", "2147483647.AAAAAAAAAAAAAAAAAAAAAA==.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="));
+    }
+
+    [Fact]
+    public void PasswordHasher_EightByteKey_IsFalse()
+    {
+        Assert.False(PasswordHasher.Verify("anything", "600000.AAAAAAAAAAAAAAAAAAAAAA==.AAAAAAAAAAA="));
+    }
+
+    [Fact]
+    public void PasswordHasher_FourByteSalt_IsFalse()
+    {
+        // A 32-byte key of zeros, written as base64 (44 characters).
+        var key = Convert.ToBase64String(new byte[32]);
+
+        Assert.False(PasswordHasher.Verify("anything", $"600000.AAAAAA==.{key}"));
     }
 
     [Theory]
@@ -183,9 +207,9 @@ public sealed class AccountPrimitivesAdversarialTests
     }
 
     [Fact]
-    public void PasswordHasher_NeedsRehashOfNull_ThrowsRatherThanAnswering_Finding()
+    public void PasswordHasher_NeedsRehashOfNull_IsTrue()
     {
-        Assert.Throws<NullReferenceException>(() => PasswordHasher.NeedsRehash(null!));
+        Assert.True(PasswordHasher.NeedsRehash(null!));
     }
 
     [Fact]

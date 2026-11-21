@@ -19,6 +19,15 @@ public static class PasswordHasher
     private const int KeySizeBytes = 32;
     // OWASP's current figure for PBKDF2-HMAC-SHA256 (2026-11-03, up from 100 000); older hashes still verify and are upgraded at the next sign-in (see NeedsRehash).
     private const int Iterations = 600_000;
+    // A stored count above the maximum would hang sign-in on one request; below the minimum PBKDF2 throws, and this code never wrote one.
+    private const int MinIterations = 1;
+    private const int MaxIterations = 10_000_000;
+    // Fewer salt bytes than this is too little randomness for a per-password salt.
+    private const int MinSaltBytes = 8;
+    // Older hashes copied in from the apps may differ in key size, but a key under 16 bytes is never one this code wrote.
+    // The upper bound stops a stored hash from making Verify allocate or compare an unbounded key.
+    private const int MinKeyBytes = 16;
+    private const int MaxKeyBytes = 64;
     private static readonly HashAlgorithmName Algorithm = HashAlgorithmName.SHA256;
 
     /// <summary>Produces a self-contained hash string: "{iterations}.{saltBase64}.{keyBase64}".</summary>
@@ -29,9 +38,9 @@ public static class PasswordHasher
         return $"{Iterations}.{Convert.ToBase64String(salt)}.{Convert.ToBase64String(key)}";
     }
 
-    /// <summary>True when the stored hash was made with fewer iterations than today's, so a successful sign-in should save a fresh one.</summary>
+    /// <summary>True when the stored hash was made with fewer iterations than today's, so a successful sign-in should save a fresh one. A missing hash counts as needing one.</summary>
     public static bool NeedsRehash(string hash) =>
-        !int.TryParse(hash.Split('.', 2)[0], out var iterations) || iterations < Iterations;
+        string.IsNullOrEmpty(hash) || !int.TryParse(hash.Split('.', 2)[0], out var iterations) || iterations < Iterations;
 
     // A hash made once, so a sign-in for an address with no account (or no password) can spend the same time as one for a real account.
     private static readonly Lazy<string> Decoy = new(() => Hash("decoy password that no account has"));
@@ -41,24 +50,45 @@ public static class PasswordHasher
 
     public static bool Verify(string password, string hash)
     {
-        var parts = hash.Split('.', 3);
-        if (parts.Length != 3 || !int.TryParse(parts[0], out var iterations))
-        {
-            return false;
-        }
-
-        byte[] salt, expectedKey;
-        try
-        {
-            salt = Convert.FromBase64String(parts[1]);
-            expectedKey = Convert.FromBase64String(parts[2]);
-        }
-        catch (FormatException)
+        ArgumentNullException.ThrowIfNull(password);
+        if (string.IsNullOrEmpty(hash) || !TryParse(hash, out var iterations, out var salt, out var expectedKey))
         {
             return false;
         }
 
         var actualKey = Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, Algorithm, expectedKey.Length);
         return CryptographicOperations.FixedTimeEquals(actualKey, expectedKey);
+    }
+
+    // Refuses anything this code could not have written before any PBKDF2 work is done. An empty key would
+    // otherwise compare equal to the empty PBKDF2 output and verify every password.
+    private static bool TryParse(string hash, out int iterations, out byte[] salt, out byte[] key)
+    {
+        iterations = 0;
+        salt = [];
+        key = [];
+
+        var parts = hash.Split('.', 3);
+        if (parts.Length != 3 || !int.TryParse(parts[0], out iterations))
+        {
+            return false;
+        }
+
+        if (iterations is < MinIterations or > MaxIterations)
+        {
+            return false;
+        }
+
+        try
+        {
+            salt = Convert.FromBase64String(parts[1]);
+            key = Convert.FromBase64String(parts[2]);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+
+        return salt.Length >= MinSaltBytes && key.Length is >= MinKeyBytes and <= MaxKeyBytes;
     }
 }
