@@ -172,6 +172,10 @@ public sealed class AccountEmailService : IDisposable
         _onConfirmationRequested = options.OnConfirmationRequested;
         _now = now ?? TimeProvider.System.GetUtcNow;
         _onSendFailure = onSendFailure;
+        // A ceiling below one would throw on the first request (a 500); refuse it as a configuration error instead.
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.MaxPerClientPerHour, 1, nameof(AccountEmailOptions.MaxPerClientPerHour));
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.MaxPerHour, 1, nameof(AccountEmailOptions.MaxPerHour));
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.MaxPerDay, 1, nameof(AccountEmailOptions.MaxPerDay));
         _maxPerClientPerHour = options.MaxPerClientPerHour;
         _hourlyCap = new SlidingWindowRateLimiter(options.MaxPerHour, TimeSpan.FromHours(1));
         _dailyCap = new SlidingWindowRateLimiter(options.MaxPerDay, TimeSpan.FromDays(1));
@@ -518,15 +522,22 @@ public sealed class AccountEmailService : IDisposable
 
     private (CodeCheckStatus Status, Pending? Pending) Check(string pendingKey, string? code)
     {
-        if (!_pending.TryGetValue(pendingKey, out var pending) || pending.ExpiresAt < _now())
+        // Removals name the exact entry this call read: a newer request for the same address and browser may have
+        // replaced it, and an older check must not throw that newer code away.
+        if (!_pending.TryGetValue(pendingKey, out var pending))
         {
-            _pending.TryRemove(pendingKey, out _);
+            return (CodeCheckStatus.Expired, null);   // nothing read, so nothing of ours to remove
+        }
+
+        if (pending.ExpiresAt < _now())
+        {
+            _pending.TryRemove(new KeyValuePair<string, Pending>(pendingKey, pending));
             return (CodeCheckStatus.Expired, null);
         }
 
         if (!pending.TryTakeAttempt(MaxAttempts))
         {
-            _pending.TryRemove(pendingKey, out _);
+            _pending.TryRemove(new KeyValuePair<string, Pending>(pendingKey, pending));
             return (CodeCheckStatus.TooManyAttempts, null);
         }
 
@@ -536,8 +547,10 @@ public sealed class AccountEmailService : IDisposable
             return (CodeCheckStatus.WrongCode, null);
         }
 
-        _pending.TryRemove(pendingKey, out _);
-        return (CodeCheckStatus.Confirmed, pending);
+        // Single use even when two correct answers race: only the call that removes the entry confirms.
+        return _pending.TryRemove(new KeyValuePair<string, Pending>(pendingKey, pending))
+            ? (CodeCheckStatus.Confirmed, pending)
+            : (CodeCheckStatus.Expired, null);
     }
 
     private bool TryAcquire(string key, int max = MaxRequestsPerHour) => _limiters.TryAcquire(key, max, _now());

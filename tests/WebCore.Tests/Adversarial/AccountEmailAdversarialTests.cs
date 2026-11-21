@@ -172,10 +172,10 @@ public sealed class AccountEmailAdversarialTests
         Assert.Equal(CodeCheckStatus.Confirmed, fixture.Service.ConfirmSignInAsync("a@b.co", "client", second).Result.Status);
     }
 
-    [Fact(Skip = "FINDING F-E4 (security): Check() increments Attempts without a lock, so a parallel burst can exceed the five-guess limit")]
-    public void Confirm_FiveWrongGuessesInParallel_AllowsNoMoreThanFiveGuesses_Finding()
+    [Fact]
+    public void Confirm_FiveWrongGuessesInParallel_AllowsNoMoreThanFiveGuesses()
     {
-        // Check() reads and increments Attempts without a lock, so a burst of parallel guesses can all read a low count.
+        // A burst of parallel guesses must not all read a low count: the guess count is incremented atomically.
         // Only five wrong answers are allowed; the rest should be TooManyAttempts.
         var fixture = new Fixture(deliveryConfigured: false, exposeCode: true);
         var real = fixture.Service.RequestSignInCodeAsync("a@b.co", "client").Result.DevCode!;
@@ -189,10 +189,24 @@ public sealed class AccountEmailAdversarialTests
         Assert.True(results.Count(s => s == CodeCheckStatus.WrongCode) <= 5);
     }
 
+    [Fact]
+    public async Task Confirm_TwoCorrectAnswersInParallel_OnlyOneConfirms()
+    {
+        // A code is single-use even when two correct confirmations race: only the call that removes it confirms.
+        var fixture = new Fixture(deliveryConfigured: false, exposeCode: true);
+        var real = fixture.Service.RequestSignInCodeAsync("a@b.co", "client").Result.DevCode!;
+
+        var results = await Task.WhenAll(
+            fixture.Service.ConfirmSignInAsync("a@b.co", "client", real),
+            fixture.Service.ConfirmSignInAsync("a@b.co", "client", real));
+
+        Assert.Equal(1, results.Count(r => r.Status == CodeCheckStatus.Confirmed));
+    }
+
     // ---- Account enumeration and limiter edges ----
 
-    [Fact(Skip = "FINDING F-E1 (privacy): a known account reports RateLimited after five requests while an unknown address never does")]
-    public void PasswordReset_KnownAndUnknownAddresses_AnswerTheSameWhenRateLimited_Finding()
+    [Fact]
+    public void PasswordReset_KnownAndUnknownAddresses_AnswerTheSameWhenRateLimited()
     {
         var fixture = new Fixture(deliveryConfigured: true);
         fixture.Users.Add(new User { Email = "known@b.co", EmailVerifiedAt = Start });
@@ -231,18 +245,10 @@ public sealed class AccountEmailAdversarialTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new Fixture(deliveryConfigured: true, maxPerHour: 0));
     }
 
-    [Fact(Skip = "FINDING F-E3: a zero per-client ceiling passes construction and throws ArgumentOutOfRange on the first request, a 500 instead of a config error")]
-    public void Options_ZeroPerClientCeiling_IsRefusedAtConstruction_Finding()
+    [Fact]
+    public void Options_ZeroPerClientCeiling_IsRefusedAtConstruction()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new Fixture(deliveryConfigured: true, maxPerClientPerHour: 0));
-    }
-
-    [Fact]
-    public async Task Request_ZeroPerClientCeiling_ThrowsOnTheFirstRequest_AsRecorded()
-    {
-        var fixture = new Fixture(deliveryConfigured: true, maxPerClientPerHour: 0);
-
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => fixture.Service.RequestSignInCodeAsync("a@b.co", "client"));
     }
 
     // ---- helpers ----
