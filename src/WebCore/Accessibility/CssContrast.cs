@@ -43,11 +43,20 @@ public static partial class CssContrast
         return failures;
     }
 
-    /// <summary>The WCAG contrast ratio between two colours given as #rrggbb.</summary>
+    /// <summary>The WCAG contrast ratio between two colours, each as #rrggbb, #rgb or rgb(); anything else throws.</summary>
     public static double Ratio(string foreground, string background)
     {
-        var (a, b) = (Luminance(foreground), Luminance(background));
+        var (a, b) = (Luminance(Normalised(foreground)), Luminance(Normalised(background)));
         return (Math.Max(a, b) + 0.05) / (Math.Min(a, b) + 0.05);
+    }
+
+    // The forms a stylesheet writes are read the same way the rules are; a value that is none of them is refused by name
+    // rather than passed to the luminance sum as garbage.
+    private static string Normalised(string colour)
+    {
+        ArgumentNullException.ThrowIfNull(colour);
+        var value = colour.Trim();
+        return Hex(value) ?? Rgb(value) ?? throw new ArgumentException($"Not a colour this check can read: \"{colour}\".", nameof(colour));
     }
 
     private sealed record Rule(string Selector, string Body, bool InDarkMedia)

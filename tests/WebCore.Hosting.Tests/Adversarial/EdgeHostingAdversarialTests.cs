@@ -129,10 +129,10 @@ public sealed class EdgeHostingAdversarialTests : IDisposable
         Assert.True(ProbePaths.IsProbe(path));
     }
 
-    [Fact(Skip = "FINDING F-H3 (security): traversal written after /.well-known/ is exempted before the traversal check runs")]
-    public void ProbePaths_TraversalHiddenUnderWellKnown_SlipsThroughTheExemption_Finding()
+    [Fact]
+    public void ProbePaths_TraversalHiddenUnderWellKnown_IsRefused()
     {
-        // The well-known exemption is checked before the traversal test, so a ".." after it is not refused.
+        // The traversal test runs before the /.well-known/ exemption, so a ".." after that prefix is still refused.
         Assert.True(ProbePaths.IsProbe("/.well-known/../../x.php"));
     }
 
@@ -296,13 +296,16 @@ public sealed class EdgeHostingAdversarialTests : IDisposable
         Assert.Throws<ArgumentNullException>(() => new ContentSecurityPolicy().Allow("script-src", null!));
     }
 
-    [Fact(Skip = "FINDING F-CSP1 (config): CSP sources are not validated; a ';' in a configured source writes a new directive")]
-    public void Csp_SourceWithASemicolon_CanInjectAnotherDirective_Finding()
+    [Theory]
+    [InlineData("https://a; script-src x")]
+    [InlineData("a,b")]
+    [InlineData("a b")]
+    [InlineData("a\u0001")]
+    public void Csp_SourceWithASemicolonCommaOrSpace_IsRefused(string source)
     {
-        // Sources are not validated, so a configured value carrying ";" writes a new directive into the header.
-        var text = new ContentSecurityPolicy().Allow("script-src", "https://cdn.example; script-src 'unsafe-inline'").ToString();
-
-        Assert.DoesNotContain("; script-src 'unsafe-inline'", text);
+        // A separator inside a source would end its directive or start another one in the single header value.
+        Assert.ThrowsAny<ArgumentException>(() => new ContentSecurityPolicy().Allow("script-src", source));
+        Assert.ThrowsAny<ArgumentException>(() => new ContentSecurityPolicy().Set("script-src", source));
     }
 
     [Fact]

@@ -106,10 +106,10 @@ public sealed class OperationsAdversarialTests
     [InlineData("release-2026-13-01-0000")]
     [InlineData("release-2026-11-21-2560")]
     [InlineData("release-2026-11-21-0960")]
-    public void ParseReleaseTag_ImpossibleDateOrTime_ThrowsRatherThanReturningNull_Finding(string tag)
+    public void ParseReleaseTag_ImpossibleDateOrTime_IsNull(string tag)
     {
-        // A git tag that matches the shape but names no real moment throws out of the parser instead of being skipped.
-        Assert.ThrowsAny<ArgumentOutOfRangeException>(() => ReleaseNotesParser.ParseReleaseTag(tag));
+        // A tag that matches the shape but names no real moment is skipped like any other non-release tag.
+        Assert.Null(ReleaseNotesParser.ParseReleaseTag(tag));
     }
 
     [Fact]
@@ -138,9 +138,9 @@ public sealed class OperationsAdversarialTests
     }
 
     [Fact]
-    public void ParseShortStat_AHugeCount_ThrowsOverflow_AsRecorded()
+    public void ParseShortStat_AHugeCount_ReadsAsZero()
     {
-        Assert.Throws<OverflowException>(() => ReleaseNotesParser.ParseShortStat("99999999999 files changed"));
+        Assert.Equal((0, 0, 0), ReleaseNotesParser.ParseShortStat("99999999999 files changed"));
     }
 
     [Fact]

@@ -29,14 +29,14 @@ public sealed class ContentSecurityPolicy
     public ContentSecurityPolicy Allow(string directive, params string[] sources)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directive);
-        ArgumentNullException.ThrowIfNull(sources);
+        var valid = ValidSources(sources);
         if (!_directives.TryGetValue(directive, out var list))
         {
             list = [];
             _directives[directive] = list;
         }
 
-        foreach (var source in sources.Where(s => !list.Contains(s, StringComparer.Ordinal)))
+        foreach (var source in valid.Where(s => !list.Contains(s, StringComparer.Ordinal)))
         {
             list.Add(source);
         }
@@ -48,9 +48,27 @@ public sealed class ContentSecurityPolicy
     public ContentSecurityPolicy Set(string directive, params string[] sources)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directive);
-        _directives[directive] = [.. sources];
+        _directives[directive] = [.. ValidSources(sources)];
         return this;
     }
+
+    // The policy is written as one header value, so a source holding a separator or a control character could end its
+    // directive early or start another one. It is refused where it is configured, not written into the header.
+    private static string[] ValidSources(string[] sources)
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        foreach (var source in sources)
+        {
+            if (string.IsNullOrWhiteSpace(source) || source.Any(IsForbiddenInSource))
+            {
+                throw new ArgumentException($"A Content-Security-Policy source cannot be empty or hold whitespace, ';', ',' or a control character: \"{source}\".", nameof(sources));
+            }
+        }
+
+        return sources;
+    }
+
+    private static bool IsForbiddenInSource(char c) => c is ';' or ',' || char.IsWhiteSpace(c) || char.IsControl(c);
 
     /// <summary>A copy to change for one request without touching the site-wide policy.</summary>
     public ContentSecurityPolicy Clone()

@@ -20,14 +20,21 @@ public static class ProbePaths
     /// <summary>True when the path is one only a scanner would ask for.</summary>
     public static bool IsProbe(string? path)
     {
-        if (string.IsNullOrEmpty(path) || path.StartsWith("/.well-known/", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrEmpty(path))
         {
             return false;
         }
 
+        // Traversal is tested before the /.well-known/ exemption: a ".." written after that prefix is still traversal,
+        // and the exemption must not let it through.
         if (path.Contains("..", StringComparison.Ordinal) || path.Contains('\\', StringComparison.Ordinal))
         {
             return true;   // path traversal
+        }
+
+        if (path.StartsWith("/.well-known/", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
         }
 
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);

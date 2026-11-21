@@ -322,10 +322,16 @@ public sealed class SettingsContrastGeminiAdversarialTests
         Assert.Equal(1.0, CssContrast.Ratio("#808080", "#808080"), 6);
     }
 
-    [Fact(Skip = "FINDING F-C1: the public Ratio method only accepts six-digit hex; #fff throws (exception type not checked)")]
-    public void CssContrast_Ratio_ThreeDigitHex_IsAccepted_Finding()
+    [Fact]
+    public void CssContrast_Ratio_ThreeDigitHex_IsAccepted()
     {
         Assert.Equal(21.0, CssContrast.Ratio("#fff", "#000"), 6);
+    }
+
+    [Fact]
+    public void CssContrast_Ratio_AColourItCannotRead_ThrowsArgumentNamingIt()
+    {
+        Assert.ThrowsAny<ArgumentException>(() => CssContrast.Ratio("not a colour", "#000"));
     }
 
     // ---- GeminiApi parsing ----
@@ -382,8 +388,8 @@ public sealed class SettingsContrastGeminiAdversarialTests
         Assert.Throws<ArgumentNullException>(() => GeminiApi.ArrayIn(null!));
     }
 
-    [Fact(Skip = "FINDING F-G1: the greedy array match runs from the first '[' to the last ']', so stray brackets in a reply hide a valid array")]
-    public void GeminiApi_ArrayIn_ReplyWithStrayBrackets_StillFindsTheArray_Finding()
+    [Fact]
+    public void GeminiApi_ArrayIn_ReplyWithStrayBrackets_StillFindsTheArray()
     {
         var items = GeminiApi.ArrayIn("Here is [note 1] then the answer [{\"a\":1}] and [end]");
 
@@ -391,9 +397,15 @@ public sealed class SettingsContrastGeminiAdversarialTests
     }
 
     [Fact]
-    public void GeminiApi_ArrayIn_ReplyWithStrayBrackets_ReturnsNothing_AsRecorded()
+    public void GeminiApi_ArrayIn_UnterminatedArray_IsEmpty()
     {
-        Assert.Empty(GeminiApi.ArrayIn("Here is [note 1] then the answer [{\"a\":1}] and [end]"));
+        Assert.Empty(GeminiApi.ArrayIn("[1, 2"));
+    }
+
+    [Fact]
+    public void GeminiApi_ArrayIn_NestedArrayAfterProse_ReadsTheWholeOuterArray()
+    {
+        Assert.Equal(2, GeminiApi.ArrayIn("text [\"a\", [1]] more").Count);
     }
 
     // ---- helpers ----

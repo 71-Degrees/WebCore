@@ -111,10 +111,15 @@ public static class ReleaseNotesParser
     /// <summary>"release-2026-09-25-1609" -> 2026-09-25 16:09 UTC, or null when the tag is not a release tag.</summary>
     public static DateTimeOffset? ParseReleaseTag(string tag)
     {
-        var match = Regex.Match(tag, @"^release-(\d{4})-(\d{2})-(\d{2})-(\d{2})(\d{2})$");
-        return match.Success
-            ? new DateTimeOffset(int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture), int.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture), int.Parse(match.Groups[3].Value, CultureInfo.InvariantCulture), int.Parse(match.Groups[4].Value, CultureInfo.InvariantCulture), int.Parse(match.Groups[5].Value, CultureInfo.InvariantCulture), 0, TimeSpan.Zero)
-            : null;
+        // The shape is checked by the pattern; whether the moment exists (no 30 February, no 25:00) is checked by the
+        // date parser, so a tag that only looks like a release tag is skipped rather than failing the whole log.
+        var match = Regex.Match(tag, @"^release-(\d{4}-\d{2}-\d{2}-\d{4})$");
+        if (!match.Success || !DateTime.TryParseExact(match.Groups[1].Value, "yyyy-MM-dd-HHmm", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var when))
+        {
+            return null;
+        }
+
+        return new DateTimeOffset(when, TimeSpan.Zero);
     }
 
     public static string ReleaseTagFor(DateTimeOffset deployedAt) => "release-" + deployedAt.ToUniversalTime().ToString("yyyy-MM-dd-HHmm", CultureInfo.InvariantCulture);
@@ -122,7 +127,9 @@ public static class ReleaseNotesParser
     /// <summary>Parses "12 files changed, 340 insertions(+), 15 deletions(-)" (git diff --shortstat); zeros when empty.</summary>
     public static (int Files, int Insertions, int Deletions) ParseShortStat(string shortStat)
     {
-        int Number(string pattern) => Regex.Match(shortStat, pattern) is { Success: true } m ? int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
+        // A count too large for int reads as zero, as a missing one does; one odd number must not fail the whole release page.
+        int Number(string pattern) =>
+            Regex.Match(shortStat, pattern) is { Success: true } m && int.TryParse(m.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var count) ? count : 0;
         return (Number(@"(\d+) files? changed"), Number(@"(\d+) insertions?"), Number(@"(\d+) deletions?"));
     }
 }

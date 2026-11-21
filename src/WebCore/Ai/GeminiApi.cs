@@ -8,12 +8,11 @@
 
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace WebCore.Ai;
 
 /// <summary>The one place that knows how to ask Gemini for text (the key goes in a header, never the address) and how to read the answer.</summary>
-public static partial class GeminiApi
+public static class GeminiApi
 {
     public static async Task<string> GenerateAsync(HttpClient http, string apiKey, string model, string body, CancellationToken cancellationToken)
     {
@@ -44,26 +43,38 @@ public static partial class GeminiApi
             : string.Empty;
     }
 
-    /// <summary>The JSON array written somewhere in a reply (a model may wrap it in prose), parsed; empty when there is none or it is not valid.</summary>
+    /// <summary>The first JSON array written in a reply (a model may wrap it in prose), parsed; empty when there is none.</summary>
     public static IReadOnlyList<JsonElement> ArrayIn(string text)
     {
-        var match = JsonArray().Match(text);
-        if (!match.Success)
+        ArgumentNullException.ThrowIfNull(text);
+        // '[' is one ASCII byte and never occurs inside a multi-byte UTF-8 character, so the search can run on the bytes.
+        var utf8 = Encoding.UTF8.GetBytes(text);
+        for (var start = Array.IndexOf(utf8, (byte)'['); start >= 0; start = Array.IndexOf(utf8, (byte)'[', start + 1))
         {
-            return [];
+            if (ArrayAt(utf8, start) is { } array)
+            {
+                return array;
+            }
         }
 
+        return [];
+    }
+
+    // Reads one complete JSON value that starts at this '['. Prose brackets ("[note 1]") are not valid JSON, so they
+    // return null and the search moves on; only a whole, valid value counts.
+    private static IReadOnlyList<JsonElement>? ArrayAt(byte[] utf8, int start)
+    {
         try
         {
-            using var doc = JsonDocument.Parse(match.Value);
+            var reader = new Utf8JsonReader(utf8.AsSpan(start));
+            reader.Read();
+            reader.Skip();
+            using var doc = JsonDocument.Parse(utf8.AsMemory(start, (int)reader.BytesConsumed));
             return [.. doc.RootElement.EnumerateArray().Select(e => e.Clone())];
         }
         catch (JsonException)
         {
-            return [];
+            return null;
         }
     }
-
-    [GeneratedRegex(@"\[.*\]", RegexOptions.Singleline)]
-    private static partial Regex JsonArray();
 }
