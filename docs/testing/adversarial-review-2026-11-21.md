@@ -102,3 +102,21 @@ These pass and assert today's behaviour. Each is named `_Finding` or `_AsRecorde
 3. Tests: `tests/WebCore.Tests/Adversarial/*.cs` and `tests/WebCore.Hosting.Tests/Adversarial/*.cs`. Names say what input was used; `_Finding` and `_AsRecorded` say whether the assertion is the desired behaviour or a recording.
 4. To verify a finding: unskip it and run `dotnet test --filter "FullyQualifiedName~Adversarial"`.
 5. Coverage numbers come from cobertura output of `dotnet test WebCore.slnx --collect:"XPlat Code Coverage"`, merged by line union (method in this file's Numbers section).
+
+## Resolution (same day: Opus judged, Haiku built, one slice per commit)
+
+Every finding test above is now live (unskipped) and passing; the "recorded" tests that described a fixed behaviour were flipped to the new one.
+
+| Finding | Commit | What was done |
+|---|---|---|
+| F-A2, F-A1 | 6c08b84 | `PasswordHasher.Verify` refuses before any PBKDF2 work: null/empty hash, iterations outside 1..10 000 000, salt under 8 bytes, key outside 16..64 bytes. |
+| F-E4, F-E1, F-E3 | 51f3c65 | Attempts counted with Interlocked; a correct code confirms only for the call that removes it; reset spends the limits before the lookup; ceilings under 1 fail at construction. |
+| F-R1, F-E2 | f5434ca | A full key table forgets idle, then least-used keys (was: cleared). AccountEmailService uses KeyedRateLimiter instead of its own copy. KeyedCache and KeyedRateLimiter refuse sizes under 1; AccountAttemptLimiter no longer overflows. |
+| F-H1, F-H2 | 1337032 | IsStale compares hours (no overflow); Sparkline skips non-finite values, computes in halves, encodes the stroke. Ordinary output pinned and unchanged. |
+| F-H3, F-CSP1, F-C1, F-G1 | 5f13f4f | Traversal checked before the well-known exemption; CSP sources validated; Ratio normalises colours; ArrayIn returns the first complete JSON array; ParseReleaseTag/ParseShortStat never throw. |
+| Recorded items | 50e92c4 | Return URL cap 2048; frozen Exempt table; EmailMask (null sender logs a masked address); AuditLog options checked at construction. |
+| Test plumbing | 4af9df8 | ManualTimeProvider: infinite never fires, periodic repeats, Change re-arms. Blob tests are `[BlobFact]` and report as skipped. |
+| F-AU1 | c14174e | Owner's decision: a forgotten person's own entries are removed; their actions on others' items keep the name, with id `forgotten` and no trace or path. Actor index `actor-{id}.json`. |
+| F-AU2 | (dropped) | Tested misuse (scopes disposed out of order); the test was removed. |
+
+Still open: the Hosting endpoint files, WebCore.Deploy and WebCore.UI were not probed. The apps' own tests that use ManualTimeProvider (CrateDigger, TriviaNight) should be run at the next WebCore submodule bump.
