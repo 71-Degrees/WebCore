@@ -233,7 +233,7 @@ public sealed class HealthAndAuditEndpointsAdversarialTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    [Fact(Skip = "FINDING F-W8 (Low): a numeric status outside the enum is accepted (200) and stored; desired: 400.")]
+    [Fact]
     public async Task Publish_NumericStatusOutsideTheEnum_IsBadRequest()
     {
         await using var site = await StartHealthAsync();
@@ -291,7 +291,19 @@ public sealed class HealthAndAuditEndpointsAdversarialTests
         Assert.Equal("/admin/quiz-checks", (await Store(site).GetAsync("production")).Single().Link);
     }
 
-    [Fact(Skip = "FINDING F-W3 (Low): a link of \"/\\\\evil.example\" is stored as-is (browsers read it as another host); desired: dropped.")]
+    [Fact]
+    public async Task Publish_NormalAdminHealthLink_KeepsItsLink()
+    {
+        // The local-path rule must not drop an ordinary link: a valid publication with "/admin/health" keeps it.
+        await using var site = await StartHealthAsync();
+
+        var response = await PutJsonAsync(site, "/api/health/signals", Publication(Signal(extra: ",\"link\":\"/admin/health\"")));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("/admin/health", (await Store(site).GetAsync("production")).Single().Link);
+    }
+
+    [Fact]
     public async Task Publish_BackslashLinkThatBrowsersReadAsOtherHost_IsDropped()
     {
         // "/\evil.example" is read by browsers as "//evil.example": a link that starts with a slash and a backslash must not survive.
@@ -326,7 +338,7 @@ public sealed class HealthAndAuditEndpointsAdversarialTests
         Assert.False(stored.IsStale(DateTimeOffset.UtcNow));
     }
 
-    [Fact(Skip = "FINDING F-W4 (Low): expectedEveryHours 1e400 overflows to infinity; the store's JSON write throws ArgumentException (500, nothing stored); desired: 400.")]
+    [Fact]
     public async Task Publish_InfinityExpectedHours_IsRefusedWith400()
     {
         // An expectation that overflows to infinity must be a clean refusal, not a failure to store the publication.
@@ -350,7 +362,7 @@ public sealed class HealthAndAuditEndpointsAdversarialTests
         Assert.Equal("second", (await Store(site).GetAsync("production")).Single().Headline);
     }
 
-    [Fact(Skip = "FINDING F-W7 (Low): a signal id of 1000 characters is accepted (200); nothing caps the id length; desired: 400.")]
+    [Fact]
     public async Task Publish_ThousandCharacterSignalId_IsBadRequest()
     {
         // A signal id is a dictionary key stored with every publication; nothing in this door caps its length.

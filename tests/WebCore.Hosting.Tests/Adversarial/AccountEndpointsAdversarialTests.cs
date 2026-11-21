@@ -367,7 +367,7 @@ public sealed class AccountEndpointsAdversarialTests
         Assert.Equal("anonymous", await site.WhoAsync());
     }
 
-    [Fact(Skip = "FINDING F-W6 (Low): a display name with a control character is accepted and the account is created (desired: refused).")]
+    [Fact]
     public async Task Register_DisplayNameWithAControlCharacter_IsRefused()
     {
         // A name is shown on the account page and written into audit entries; a control character in it has no business there.

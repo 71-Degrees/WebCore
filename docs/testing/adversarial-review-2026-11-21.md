@@ -184,3 +184,13 @@ Confirmed as correct (passing, named after the input): logout and every form end
 - Read endpoints of the health dashboard and report page (only the PUT write door was in these files).
 - `WebCore.Deploy` and `WebCore.UI`: still not probed.
 - Note, outside this pass: `tests/WebCore.Hosting.Tests/Adversarial/EdgeHostingAdversarialTests.cs` (first pass) contains non-ASCII characters in string literals (`clé-secrète`); it is not touched here.
+
+### Second pass resolution (same day)
+
+| Finding | What was done |
+|---|---|
+| F-W3 | A signal link survives only if `LocalReturnUrl.Sanitize` leaves it unchanged (the one "stays on this site" rule). |
+| F-W4, F-W7, F-W8 | `HealthEndpoints.ProblemWith` refuses with 400: an id over 100 characters, a status outside the enum, a non-finite `expectedEveryHours` or `value`. |
+| F-W5 | Admin forms treat a user id that is not a document id, or over 100 characters, as unknown before any store call. |
+| F-W6 | `DisplayNames.IsValid` refuses control characters; the registration message says so. |
+| F-W1, F-W2 | Open (medium): an oversized chunked report answers 500, not 413; a masquerading admin is audited as the viewed account. |

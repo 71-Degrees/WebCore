@@ -65,7 +65,7 @@ public static class AccountEndpoints
 
         if (!DisplayNames.IsValid(displayName))
         {
-            return Fail($"Please enter a display name of up to {DisplayNames.MaxLength} characters.");
+            return Fail($"Please enter a display name of up to {DisplayNames.MaxLength} characters, using ordinary letters, digits and punctuation.");
         }
 
         var problem = PasswordRules.Validate(password, form["confirmPassword"].ToString());

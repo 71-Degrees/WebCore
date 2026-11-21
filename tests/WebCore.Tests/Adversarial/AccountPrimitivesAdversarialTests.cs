@@ -324,6 +324,16 @@ public sealed class AccountPrimitivesAdversarialTests
         Assert.False(DisplayNames.IsValid(name));
     }
 
+    [Theory]
+    [InlineData("a\u0001b")]
+    [InlineData("\u007f")]
+    [InlineData("x\u0000")]
+    public void DisplayNames_ControlCharacter_IsInvalid(string name)
+    {
+        // A name is shown on pages and written into audit entries, so a control character is refused rather than stored.
+        Assert.False(DisplayNames.IsValid(name));
+    }
+
     [Fact]
     public void DisplayNames_ZeroWidthSpaceOnly_IsAcceptedAsAName_Finding()
     {

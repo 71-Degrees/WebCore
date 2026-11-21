@@ -6,6 +6,7 @@
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using WebCore.Accounts;
 using WebCore.Health;
 using WebCore.Storage;
 
@@ -18,6 +19,9 @@ namespace WebCore.Hosting.Health;
 public static class HealthEndpoints
 {
     private const int MaxSignals = 100;
+
+    // A signal id is a dictionary key stored with every publication, so it is capped like a document name should be.
+    private const int MaxSignalIdLength = 100;
 
     /// <summary>
     /// PUT /api/health/signals                      a <see cref="HealthPublication"/>: stores the signals, raises alerts for anything that turned red or recovered.
@@ -60,9 +64,9 @@ public static class HealthEndpoints
             return Results.BadRequest($"Send between 1 and {MaxSignals} signals.");
         }
 
-        if (publication.Signals.FirstOrDefault(s => !DocumentNames.IsValid(s.Id) || string.IsNullOrWhiteSpace(s.Title)) is { } bad)
+        if (publication.Signals.Select(ProblemWith).FirstOrDefault(p => p is not null) is { } problem)
         {
-            return Results.BadRequest($"Signal '{bad.Id}' needs an id of letters, digits and dashes, and a title.");
+            return Results.BadRequest(problem);
         }
 
         var now = time.GetUtcNow();
@@ -96,6 +100,29 @@ public static class HealthEndpoints
         return Results.NoContent();
     }
 
+    // What a signal must be before it is stored. The first problem found is the one reported. A value that is not a finite
+    // number is refused rather than clamped: infinity cannot be written to JSON, so the store would fail after the request was accepted.
+    private static string? ProblemWith(HealthSignal s)
+    {
+        if (!DocumentNames.IsValid(s.Id) || s.Id.Length > MaxSignalIdLength || string.IsNullOrWhiteSpace(s.Title))
+        {
+            return $"Signal '{s.Id}' needs an id of letters, digits and dashes, and a title.";
+        }
+
+        // An out-of-range status would be stored as a number that no page knows how to colour.
+        if (!Enum.IsDefined(s.Status))
+        {
+            return $"Signal '{s.Id}' has a status that is not Unknown, Green, Amber or Red.";
+        }
+
+        if (s.ExpectedEveryHours is { } hours && !double.IsFinite(hours))
+        {
+            return $"Signal '{s.Id}' needs an expectedEveryHours that is a finite number.";
+        }
+
+        return s.Value is { } value && !double.IsFinite(value) ? $"Signal '{s.Id}' needs a value that is a finite number." : null;
+    }
+
     // What goes on a page and into a push is cut to size, a link must stay on this site, and a time in the future is the time of publishing.
     private static HealthSignal Clamp(HealthSignal s, DateTimeOffset now) => s with
     {
@@ -104,10 +131,15 @@ public static class HealthEndpoints
         Headline = Cut(s.Headline, 200),
         Detail = s.Detail is null ? null : Cut(s.Detail, 600),
         Unit = s.Unit is null ? null : Cut(s.Unit, 12),
-        Link = s.Link is { } l && l.StartsWith('/') && !l.StartsWith("//", StringComparison.Ordinal) ? Cut(l, 200) : null,
+        Link = s.Link is { } l && IsLocalLink(l) ? Cut(l, 200) : null,
         ReportId = HealthReportStore.IsValidId(s.ReportId) ? s.ReportId : null,
         AsOf = s.AsOf > now ? now : s.AsOf,
     };
+
+    // The same rule as a return URL: a browser reads "/\host" as another host, so a link survives only when it is a local path
+    // that sanitising leaves unchanged. Sanitize answers "/" for anything unsafe, so a link of exactly "/" still passes.
+    private static bool IsLocalLink(string? link) =>
+        link is not null && link.StartsWith('/') && LocalReturnUrl.Sanitize(link) == link;
 
     private static string Cut(string text, int max) => text.Length <= max ? text : text[..max];
 }

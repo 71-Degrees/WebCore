@@ -17,10 +17,12 @@ public static class DisplayNames
     /// <summary>Tidies whitespace and trims; empty stays empty.</summary>
     public static string Tidy(string? name) => Regex.Replace((name ?? string.Empty).Trim(), @"\s+", " ");
 
+    // A control character (NUL, DEL, a stray tab-like code) is refused: the name is shown on pages and written into audit entries,
+    // where it would break the line or pass for a blank.
     public static bool IsValid(string? name)
     {
         var tidy = Tidy(name);
-        return tidy.Length > 0 && tidy.Length <= MaxLength;
+        return tidy.Length > 0 && tidy.Length <= MaxLength && !tidy.Any(char.IsControl);
     }
 
     /// <summary>Compares names ignoring case and extra spacing.</summary>

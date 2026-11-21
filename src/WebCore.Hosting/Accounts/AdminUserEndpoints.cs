@@ -5,6 +5,7 @@
  */
 using WebCore.Accounts;
 using WebCore.Hosting.Security;
+using WebCore.Storage;
 
 namespace WebCore.Hosting.Accounts;
 
@@ -12,6 +13,8 @@ namespace WebCore.Hosting.Accounts;
 /// admin can never act on themself: that is the only way to lose the last admin by accident.</summary>
 internal static class AdminUserEndpoints
 {
+    private const int MaxUserIdLength = 100;
+
     public static void Map(WebApplication app)
     {
         var options = app.Services.GetRequiredService<AccountOptions>();
@@ -116,12 +119,22 @@ internal static class AdminUserEndpoints
 
     private static bool IsSelf(HttpContext http, string userId) => string.Equals(AccountClaims.UserIdOf(http.User), userId, StringComparison.Ordinal);
 
-    /// <summary>The profile, or null for an unknown or malformed id (never an exception from a tampered form).</summary>
+    // A user id is a document name, and a name longer than the cap cannot be a file name on the store.
+    private static bool IsPlausibleUserId(string userId) =>
+        !string.IsNullOrWhiteSpace(userId) && userId.Length <= MaxUserIdLength && DocumentNames.IsValid(userId);
+
+    /// <summary>The profile, or null for an unknown or malformed id (never an exception from a tampered form). Every handler reads its target through
+    /// here, so a malformed id is refused before any store sees it: a long one reaches the file store as a file name and fails there.</summary>
     private static async Task<UserProfile?> TryGetProfileAsync(IUserProfileRepository profiles, string userId)
     {
+        if (!IsPlausibleUserId(userId))
+        {
+            return null;
+        }
+
         try
         {
-            return string.IsNullOrWhiteSpace(userId) ? null : await profiles.GetAsync(userId);
+            return await profiles.GetAsync(userId);
         }
         catch (ArgumentException)
         {

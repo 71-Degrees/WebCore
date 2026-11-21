@@ -142,7 +142,7 @@ public sealed class AdminAndPasswordEndpointsAdversarialTests
         Assert.Equal("/admin/users?error=unknown", EndpointSite.LocationOf(response));
     }
 
-    [Fact(Skip = "FINDING F-W5 (Low): a 1000-character user id reaches the file store and the request answers 500 (IOException, file name too long); desired: error=unknown.")]
+    [Fact]
     public async Task AdminRoles_ThousandCharacterTarget_IsReportedAsUnknown()
     {
         await using var site = await StartAsync();
