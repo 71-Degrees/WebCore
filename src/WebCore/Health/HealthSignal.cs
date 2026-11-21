@@ -47,8 +47,14 @@ public sealed record HealthSignal(
     /// <summary>Slack before a signal counts as stale: a nightly job that runs a little late is not an alarm.</summary>
     public const double StaleAfterMultiple = 1.5;
 
+    // Compares in hours rather than building a TimeSpan from the expectation: the value comes off the publish
+    // endpoint, and TimeSpan.FromHours throws on infinity or a huge number, which would break every page that judges
+    // staleness. An infinite expectation is never stale, so it is refused here rather than thrown.
     public bool IsStale(DateTimeOffset now) =>
-        ExpectedEveryHours is double hours && hours > 0 && now - AsOf > TimeSpan.FromHours(hours * StaleAfterMultiple);
+        ExpectedEveryHours is double hours
+        && double.IsFinite(hours)
+        && hours > 0
+        && (now - AsOf).TotalHours > hours * StaleAfterMultiple;
 
     /// <summary>What the signal counts as in the roll-up: a stale signal is at least amber, whatever its last result said.</summary>
     public HealthStatus EffectiveStatus(DateTimeOffset now) =>

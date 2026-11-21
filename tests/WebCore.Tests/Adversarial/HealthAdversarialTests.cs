@@ -44,16 +44,16 @@ public sealed class HealthAdversarialTests : IDisposable
     }
 
     [Fact]
-    public void HealthSignal_ExpectationOfPositiveInfinity_ThrowsOverflow_Finding()
+    public void HealthSignal_InfiniteExpectation_IsNeverStale()
     {
-        // The publish endpoint takes this number from the wire; TimeSpan.FromHours rejects infinity, so IsStale throws.
+        // The publish endpoint takes this number from the wire; an infinite expectation must not throw when judged.
         var signal = Signal(expectedEveryHours: double.PositiveInfinity);
 
-        Assert.Throws<OverflowException>(() => signal.IsStale(Now));
+        Assert.False(signal.IsStale(Now.AddYears(10)));
     }
 
-    [Fact(Skip = "FINDING F-H1: an absurd ExpectedEveryHours should be refused at publish, not throw when judged")]
-    public void HealthSignal_HugeExpectation_DoesNotThrowWhenJudged_Finding()
+    [Fact]
+    public void HealthSignal_HugeExpectation_DoesNotThrowWhenJudged()
     {
         var signal = Signal(expectedEveryHours: 1e300);
 
@@ -232,6 +232,15 @@ public sealed class HealthAdversarialTests : IDisposable
     }
 
     [Fact]
+    public void Sparkline_OrdinaryValues_PinnedOutput()
+    {
+        // Pinned from the code before the non-finite and encoding fixes, so the refactor is proven not to move a character.
+        var svg = Sparkline.Svg([1, 2, 3], width: 200, height: 32);
+
+        Assert.Equal("<svg width=\"200\" height=\"32\" viewBox=\"0 0 200 32\" role=\"img\" aria-label=\"trend\"><polyline fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linejoin=\"round\" points=\"0,28 100,16 200,4\"/></svg>", svg);
+    }
+
+    [Fact]
     public void Sparkline_AllEqualValues_DoNotDivideByZero()
     {
         var svg = Sparkline.Svg([5, 5, 5]);
@@ -241,19 +250,29 @@ public sealed class HealthAdversarialTests : IDisposable
     }
 
     [Fact]
-    public void Sparkline_InfinityInTheData_EmitsNaNIntoTheMarkup_AsRecorded()
+    public void Sparkline_NonFiniteValues_AreLeftOut()
     {
-        var svg = Sparkline.Svg([1, double.PositiveInfinity, 3]);
+        var withNonFinite = Sparkline.Svg([1, double.PositiveInfinity, 3, double.NaN]);
 
-        Assert.Contains("NaN", svg);
+        Assert.Equal(Sparkline.Svg([1, 3]), withNonFinite);
     }
 
-    [Fact(Skip = "FINDING F-H2 (markup): the stroke colour is written into the attribute unescaped; untrusted input could break out of it")]
-    public void Sparkline_StrokeWithQuotes_CannotBreakOutOfTheAttribute_Finding()
+    [Fact]
+    public void Sparkline_ExtremeValues_StayFinite()
+    {
+        var svg = Sparkline.Svg([double.MaxValue, -double.MaxValue, 0]);
+
+        Assert.DoesNotContain("NaN", svg);
+        Assert.DoesNotContain("Infinity", svg);
+    }
+
+    [Fact]
+    public void Sparkline_StrokeWithQuotes_CannotBreakOutOfTheAttribute()
     {
         var svg = Sparkline.Svg([1, 2], stroke: "red\" onload=\"alert(1)");
 
-        Assert.DoesNotContain("onload", svg);
+        // The quotes are encoded, so "onload" stays inside the stroke value and never becomes an attribute of its own.
+        Assert.Contains("stroke=\"red&quot; onload=&quot;alert(1)\"", svg);
     }
 
     private static HealthSignal Signal(
