@@ -12,6 +12,14 @@ namespace WebCore.Audit;
 public sealed record AuditActor(string Id, string Name, string Source, string? TraceId = null, string? Path = null)
 {
     public static readonly AuditActor System = new("system", "system", "system");
+
+    /// <summary>
+    /// The id an anonymised actor carries once that person has been forgotten. Their entries about other owners' items stay, so those histories keep their shape,
+    /// but the id, trace and path go: the name as a string is enough for an audit.
+    /// </summary>
+    public const string ForgottenId = "forgotten";
+
+    public static AuditActor Forgotten(AuditActor actor) => actor with { Id = ForgottenId, TraceId = null, Path = null };
 }
 
 /// <summary>The actor of the work in progress, carried with it (one value per request or circuit activity), so a repository that has no idea who is calling can still say who changed what.</summary>

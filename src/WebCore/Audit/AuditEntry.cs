@@ -55,8 +55,9 @@ public interface IAuditLog
     Task<IReadOnlyList<AuditEntry>> RecentAsync(int count, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Removes the owner's own list, the histories of the owner's items, and every entry about the owner or made by them from the recent list. Returns how many stored
-    /// copies went (an entry is kept in up to three lists).
+    /// Removes the owner's own list, every entry the owner owns from the histories of their items and from the recent list, and anonymises the owner's actions on other
+    /// owners' items: those entries stay, with the actor id replaced by <see cref="AuditActor.ForgottenId"/> and the name kept. Returns how many stored copies were
+    /// removed or anonymised (an entry is kept in up to three lists).
     /// </summary>
     Task<int> ForgetOwnerAsync(string ownerId, CancellationToken cancellationToken = default);
 }

@@ -209,25 +209,55 @@ public sealed class AuditAdversarialTests : IDisposable
         Assert.Empty(await log.RecentAsync(-3));
     }
 
-    [Fact(Skip = "FINDING F-AU1 (privacy): forgetting an owner leaves that owner's actions inside other owners' item histories")]
-    public async Task AuditLog_ForgetOwner_RemovesTheirActionsFromOtherOwnersItemHistories_Finding()
+    [Fact]
+    public async Task AuditLog_ForgetOwner_AnonymisesTheirActionsOnOtherOwnersItems()
     {
         var log = NewLog();
-        await log.AppendAsync(new AuditEntry
-        {
-            At = Now,
-            Actor = new AuditActor("forgotten", "Gone", "web"),
-            Kind = "song",
-            EntityId = "s1",
-            EntityName = "Song",
-            OwnerId = "someone-else",
-            Action = AuditEntry.Changed,
-        });
+        await log.AppendAsync(ActedOn("person-1", "someone-else"));
 
-        await log.ForgetOwnerAsync("forgotten");
+        await log.ForgetOwnerAsync("person-1");
 
-        var history = await log.ForItemAsync("song", "s1", 10);
-        Assert.DoesNotContain(history, e => e.Actor.Id == "forgotten");
+        var entry = Assert.Single(await log.ForItemAsync("song", "s1", 10));
+        Assert.Equal("forgotten", entry.Actor.Id);
+        Assert.Equal("Gone", entry.Actor.Name);
+        Assert.Null(entry.Actor.TraceId);
+        Assert.Null(entry.Actor.Path);
+    }
+
+    [Fact]
+    public async Task AuditLog_ForgetOwner_AnonymisesTheirActionInRecentWhenTheyOwnNoPartOfIt()
+    {
+        var log = NewLog();
+        await log.AppendAsync(ActedOn("person-1", "someone-else"));
+
+        await log.ForgetOwnerAsync("person-1");
+
+        var entry = Assert.Single(await log.RecentAsync(10));
+        Assert.Equal("forgotten", entry.Actor.Id);
+    }
+
+    [Fact]
+    public async Task AuditLog_ActorIdThatIsNotADocumentId_AppendsWithoutThrowing()
+    {
+        var log = NewLog();
+
+        await log.AppendAsync(ActedOn("a@b.c", "someone-else"));
+
+        Assert.Single(await log.RecentAsync(10));
+        Assert.Single(await log.ForItemAsync("song", "s1", 10));
+    }
+
+    [Fact]
+    public async Task AuditLog_ForgetOwner_RemovesTheActorIndex()
+    {
+        var store = new FileDocumentStore(_temp.Path);
+        var log = new AuditLog(store, TimeProvider.System);
+        await log.AppendAsync(ActedOn("person-1", "someone-else"));
+        Assert.True(await store.ExistsAsync("actor-person-1.json"));
+
+        await log.ForgetOwnerAsync("person-1");
+
+        Assert.False(await store.ExistsAsync("actor-person-1.json"));
     }
 
     [Fact]
@@ -324,6 +354,18 @@ public sealed class AuditAdversarialTests : IDisposable
         Kind = kind,
         EntityId = entityId,
         EntityName = "name",
+        OwnerId = ownerId,
+        Action = AuditEntry.Changed,
+    };
+
+    // A change to song s1, owned by someone else, made by the person with this actor id (name "Gone", with a trace id and path).
+    private static AuditEntry ActedOn(string actorId, string ownerId) => new()
+    {
+        At = Now,
+        Actor = new AuditActor(actorId, "Gone", "web", "trace-1", "/songs/s1"),
+        Kind = "song",
+        EntityId = "s1",
+        EntityName = "Song",
         OwnerId = ownerId,
         Action = AuditEntry.Changed,
     };

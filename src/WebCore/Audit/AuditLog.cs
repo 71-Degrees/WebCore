@@ -22,7 +22,8 @@ public sealed record AuditLogOptions
 
 /// <summary>
 /// The trail in one keyed document store (the app's <c>audit</c> store): <c>item-{kind}-{id}.json</c> per item, <c>owner-{id}.json</c> per owner (only for entries
-/// that name one) and <c>recent.json</c> across everything, each capped and with entries older than <see cref="AuditLogOptions.KeepFor"/> dropped as it is written.
+/// that name one), <c>actor-{id}.json</c> per actor (the item histories that actor wrote into, so forgetting them can find those) and <c>recent.json</c> across
+/// everything, each capped and with entries older than <see cref="AuditLogOptions.KeepFor"/> dropped as it is written.
 /// Appends take turns inside this process; a second instance appending at the same moment could drop one entry, which is accepted for a trail.
 /// </summary>
 public sealed partial class AuditLog(IKeyedDocumentStore store, TimeProvider time, AuditLogOptions? options = null) : IAuditLog, IDisposable
@@ -38,7 +39,9 @@ public sealed partial class AuditLog(IKeyedDocumentStore store, TimeProvider tim
         await _turn.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await AddAsync(ItemName(entry.Kind, entry.EntityId), entry, _options.KeepPerItem, cancellationToken).ConfigureAwait(false);
+            var item = ItemName(entry.Kind, entry.EntityId);
+            await AddAsync(item, entry, _options.KeepPerItem, cancellationToken).ConfigureAwait(false);
+            await IndexActorAsync(entry, item, cancellationToken).ConfigureAwait(false);
             if (entry.OwnerId is { Length: > 0 } owner)
             {
                 await AddAsync(OwnerName(owner), entry, _options.KeepPerOwner, cancellationToken).ConfigureAwait(false);
@@ -60,6 +63,11 @@ public sealed partial class AuditLog(IKeyedDocumentStore store, TimeProvider tim
 
     public Task<IReadOnlyList<AuditEntry>> RecentAsync(int count, CancellationToken cancellationToken = default) => ReadAsync(RecentName, count, cancellationToken);
 
+    /// <summary>
+    /// Removes the owner's own list, every entry the owner owns (from their items' histories and the recent list), and anonymises the owner's actions on other
+    /// owners' items (the actor becomes <see cref="AuditActor.ForgottenId"/>, keeping the name). Entries written before the actor index existed are found only
+    /// through the owner's own items and the recent list; the rest age out with <see cref="AuditLogOptions.KeepFor"/>.
+    /// </summary>
     public async Task<int> ForgetOwnerAsync(string ownerId, CancellationToken cancellationToken = default)
     {
         await _turn.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -68,13 +76,16 @@ public sealed partial class AuditLog(IKeyedDocumentStore store, TimeProvider tim
             var mine = await LoadAsync(OwnerName(ownerId), cancellationToken).ConfigureAwait(false);
             await store.DeleteAsync(OwnerName(ownerId), cancellationToken).ConfigureAwait(false);
             var removed = mine.Count;
-            // The owner's items' own histories, and the shared recent list, lose their entries too.
-            foreach (var item in mine.Select(e => ItemName(e.Kind, e.EntityId)).Distinct(StringComparer.Ordinal))
+            // The histories of the owner's own items, and of the items the person wrote into about other owners, are visited; so is the recent list.
+            var items = mine.Select(e => ItemName(e.Kind, e.EntityId)).Concat(await IndexedItemsAsync(ownerId, cancellationToken).ConfigureAwait(false));
+            foreach (var item in items.Distinct(StringComparer.Ordinal))
             {
-                removed += await RemoveOwnerFromAsync(item, ownerId, cancellationToken).ConfigureAwait(false);
+                removed += await ForgetInAsync(item, ownerId, cancellationToken).ConfigureAwait(false);
             }
 
-            return removed + await RemoveOwnerFromAsync(RecentName, ownerId, cancellationToken).ConfigureAwait(false);
+            removed += await ForgetInAsync(RecentName, ownerId, cancellationToken).ConfigureAwait(false);
+            await store.DeleteAsync(ActorName(ownerId), cancellationToken).ConfigureAwait(false);
+            return removed;
         }
         finally
         {
@@ -96,20 +107,54 @@ public sealed partial class AuditLog(IKeyedDocumentStore store, TimeProvider tim
         return options;
     }
 
-    private static bool Concerns(AuditEntry entry, string ownerId) => entry.OwnerId == ownerId || entry.Actor.Id == ownerId;
-
-    private async Task<int> RemoveOwnerFromAsync(string name, string ownerId, CancellationToken cancellationToken)
+    // Entries the owner owns are removed. Entries where the owner was only the actor stay, with the actor anonymised, so the other owner's history keeps its
+    // shape. Returns how many stored copies were removed or anonymised; nothing is written when there were none.
+    private async Task<int> ForgetInAsync(string name, string ownerId, CancellationToken cancellationToken)
     {
         var all = await LoadAsync(name, cancellationToken).ConfigureAwait(false);
-        var kept = all.Where(e => !Concerns(e, ownerId)).ToList();
-        if (kept.Count == all.Count)
+        var touched = all.Count(e => e.OwnerId == ownerId || e.Actor.Id == ownerId);
+        if (touched == 0)
         {
             return 0;
         }
 
+        var kept = all.Where(e => e.OwnerId != ownerId).Select(e => Anonymised(e, ownerId)).ToList();
         await store.SetAsync(name, kept, cancellationToken).ConfigureAwait(false);
-        return all.Count - kept.Count;
+        return touched;
     }
+
+    private static AuditEntry Anonymised(AuditEntry entry, string ownerId) =>
+        entry.Actor.Id == ownerId ? entry with { Actor = AuditActor.Forgotten(entry.Actor) } : entry;
+
+    // An actor's own index of the item histories they wrote into. Entries the person owns are not indexed: they go with the owner's own list. An actor id that
+    // is not a valid document id has no document name, so it is not indexed; that must never fail the append.
+    private async Task IndexActorAsync(AuditEntry entry, string itemName, CancellationToken cancellationToken)
+    {
+        if (!IsIndexedActor(entry))
+        {
+            return;
+        }
+
+        var name = ActorName(entry.Actor.Id);
+        var items = await store.GetAsync<List<string>>(name, cancellationToken).ConfigureAwait(false) ?? [];
+        if (items.Count > 0 && items[^1] == itemName)
+        {
+            return;
+        }
+
+        items.Remove(itemName);
+        items.Add(itemName);
+        await store.SetAsync(name, Capped(items, _options.KeepPerOwner), cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<string>> IndexedItemsAsync(string actorId, CancellationToken cancellationToken) =>
+        await store.GetAsync<List<string>>(ActorName(actorId), cancellationToken).ConfigureAwait(false) ?? [];
+
+    private static bool IsIndexedActor(AuditEntry entry) =>
+        DocumentNames.IsValid(entry.Actor.Id)
+        && entry.Actor.Id != AuditActor.System.Id
+        && entry.Actor.Id != AuditActor.ForgottenId
+        && entry.Actor.Id != entry.OwnerId;
 
     private static string ItemName(string kind, string entityId)
     {
@@ -123,13 +168,18 @@ public sealed partial class AuditLog(IKeyedDocumentStore store, TimeProvider tim
 
     private static string OwnerName(string ownerId) => "owner-" + DocumentNames.For(ownerId, "owner");
 
+    private static string ActorName(string actorId) => "actor-" + DocumentNames.For(actorId, "actor");
+
     private async Task AddAsync(string name, AuditEntry entry, int keep, CancellationToken cancellationToken)
     {
         var cutoff = time.GetUtcNow() - _options.KeepFor;
         var all = (await LoadAsync(name, cancellationToken).ConfigureAwait(false)).Where(e => e.At >= cutoff).ToList();
         all.Add(entry);
-        await store.SetAsync(name, all.Count > keep ? all[^keep..] : all, cancellationToken).ConfigureAwait(false);
+        await store.SetAsync(name, Capped(all, keep), cancellationToken).ConfigureAwait(false);
     }
+
+    // The newest <paramref name="keep"/> of a list stored newest last.
+    private static List<T> Capped<T>(List<T> items, int keep) => items.Count > keep ? items[^keep..] : items;
 
     private async Task<List<AuditEntry>> LoadAsync(string name, CancellationToken cancellationToken) =>
         await store.GetAsync<List<AuditEntry>>(name, cancellationToken).ConfigureAwait(false) ?? [];

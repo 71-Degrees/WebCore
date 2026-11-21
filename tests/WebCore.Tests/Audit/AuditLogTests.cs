@@ -89,10 +89,11 @@ public sealed class AuditLogTests : IDisposable
 
         var removed = await log.ForgetOwnerAsync("o1");
 
-        Assert.Equal(4, removed);   // stored copies: a1 in the owner's list, in a1's history and in recent; the change o1 made to b1, in recent
+        Assert.Equal(5, removed);   // removed: a1 in the owner's list, in a1's history and in recent; anonymised: the change o1 made to b1, in b1's history and in recent
         Assert.Empty(await log.ForOwnerAsync("o1", 10));
         Assert.Empty(await log.ForItemAsync("record", "a1", 10));
-        Assert.All(await log.RecentAsync(10), e => Assert.True(e.OwnerId != "o1" && e.Actor.Id != "o1"));
+        Assert.All(await log.RecentAsync(10), e => Assert.True(e.OwnerId != "o1"));
+        Assert.Contains(await log.RecentAsync(10), e => e.OwnerId == "o2" && e.Actor.Id == AuditActor.ForgottenId && e.Actor.Name == "o1");
         Assert.Equal(2, (await log.ForOwnerAsync("o2", 10)).Count);   // o2's own trail keeps every change to o2's records, including the one o1 made
     }
 
