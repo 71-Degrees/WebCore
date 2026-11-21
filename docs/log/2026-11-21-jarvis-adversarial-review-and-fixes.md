@@ -18,3 +18,10 @@
 ## Session
 
 About 09:00 to 11:28 EST (2 h 25 min). Gauge: week 82% -> 88% (123 -> 132 of 150 SP); 5-hour 29% -> 73%. Haiku built, Opus judged; 3 corrections.
+
+## Later the same session (to about 12:40 EST)
+
+- Second adversarial pass over the Hosting endpoints: 178 cases over a TestServer (26f806d); 8 findings F-W1..F-W8.
+- F-W3..F-W8 fixed and pushed (c75049b): health publish checks, links on the return-URL rule, admin id guard, display names refuse control characters.
+- Owner's decision: a forgotten web actor keeps the email as their name (docs/audit-trail.md, a87bbde).
+- Open: F-W1 (chunked report over 2 MB answers 500, not 413), F-W2 (a masquerading admin is audited as the viewed account); Deploy and UI not probed; owner to decide whether registration may say "already registered" and whether a disable form with no field re-enables.
