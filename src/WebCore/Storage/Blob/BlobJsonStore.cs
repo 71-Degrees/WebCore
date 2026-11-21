@@ -32,6 +32,9 @@ public class BlobJsonStore : IDocumentStore, IBinaryStore
         WriteIndented = true,
     };
 
+    /// <summary>How many blob reads a list runs at once.</summary>
+    private const int ParallelReads = 16;
+
     private readonly BlobContainerClient _container;
     private readonly object _ensureLock = new();
     private Task? _ensure;
@@ -134,13 +137,36 @@ public class BlobJsonStore : IDocumentStore, IBinaryStore
     /// silently skipped, matching the local repos' ListAsync behavior.</summary>
     public async IAsyncEnumerable<(string Name, T Value)> ListAsync<T>([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        // One GET per blob is a network round trip each; read them a few at a time, not one after another (a store of thousands took many seconds).
+        // Results keep the listing's order.
+        var names = new List<string>();
         await foreach (var name in ListNamesAsync(cancellationToken).ConfigureAwait(false))
         {
-            var value = await GetAsync<T>(name, cancellationToken).ConfigureAwait(false);
+            names.Add(name);
+        }
+
+        using var limiter = new SemaphoreSlim(ParallelReads);
+        var reads = names.Select(name => ReadLimitedAsync<T>(name, limiter, cancellationToken)).ToList();
+        foreach (var read in reads)
+        {
+            var (name, value) = await read.ConfigureAwait(false);
             if (value is not null)
             {
                 yield return (name, value);
             }
+        }
+    }
+
+    private async Task<(string Name, T? Value)> ReadLimitedAsync<T>(string name, SemaphoreSlim limiter, CancellationToken cancellationToken)
+    {
+        await limiter.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return (name, await GetAsync<T>(name, cancellationToken).ConfigureAwait(false));
+        }
+        finally
+        {
+            limiter.Release();
         }
     }
 
