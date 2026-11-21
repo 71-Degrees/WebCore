@@ -11,7 +11,8 @@ namespace WebCore.Accounts;
 /// <summary>
 /// The rate limiters behind the account code emails, one per key (an address, a browser or both), with a cap on how many keys are kept. The keys include
 /// a browser id the client chooses, so a flood of made-up ones must never reset the limits of real addresses: eviction drops only entries idle for a whole
-/// window (their counts are gone anyway); if that is not enough it drops the longest-idle ones down to 90 percent of the cap, never the whole table.
+/// window (their counts are gone anyway); if that is not enough it drops the least-used ones (longest idle among equals) down to 90 percent of the cap,
+/// never the whole table.
 /// </summary>
 internal sealed class LimiterTable(int maxTrackedKeys, TimeSpan window)
 {
@@ -42,7 +43,7 @@ internal sealed class LimiterTable(int maxTrackedKeys, TimeSpan window)
             var excess = _limiters.Count - (maxTrackedKeys * 9 / 10);
             if (excess > 0)
             {
-                DropLongestIdle(excess);
+                DropLeastUsed(excess, now);
             }
         }
     }
@@ -55,11 +56,20 @@ internal sealed class LimiterTable(int maxTrackedKeys, TimeSpan window)
         }
     }
 
-    private void DropLongestIdle(int count)
+    // Fewest uses left in the window go first, the longest idle among equals: the same rule as KeyedRateLimiter. Dropping the longest idle alone let a
+    // victim's address, asked five times and then left alone, be pushed out by a flood of one-use keys (the adversarial review, F-E2).
+    private void DropLeastUsed(int count, DateTimeOffset now)
     {
-        foreach (var entry in _limiters.OrderBy(e => e.Value.LastUsedTicks).Take(count).ToList())
+        var victims = _limiters
+            .Select(e => (e.Key, Uses: e.Value.CountInWindow(now), e.Value.LastUsedTicks))
+            .OrderBy(e => e.Uses)
+            .ThenBy(e => e.LastUsedTicks)
+            .Take(count)
+            .Select(e => e.Key)
+            .ToList();
+        foreach (var key in victims)
         {
-            _limiters.TryRemove(entry.Key, out _);
+            _limiters.TryRemove(key, out _);
         }
     }
 
@@ -69,6 +79,8 @@ internal sealed class LimiterTable(int maxTrackedKeys, TimeSpan window)
         private long _lastUsedTicks;
 
         public long LastUsedTicks => Interlocked.Read(ref _lastUsedTicks);
+
+        public int CountInWindow(DateTimeOffset now) => limiter.CountInWindow(now);
 
         public bool TryAcquire(DateTimeOffset now)
         {
