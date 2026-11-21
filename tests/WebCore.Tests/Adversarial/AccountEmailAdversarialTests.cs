@@ -115,7 +115,7 @@ public sealed class AccountEmailAdversarialTests
     [InlineData("12345")]
     [InlineData("1234567")]
     [InlineData("12 345 6")]
-    [InlineData("１２３４５６")]
+    [InlineData("\uFF11\uFF12\uFF13\uFF14\uFF15\uFF16")]
     public async Task Confirm_MissingOrMalformedCode_IsWrongNotAnError(string? code)
     {
         var fixture = new Fixture(deliveryConfigured: false, exposeCode: true);
