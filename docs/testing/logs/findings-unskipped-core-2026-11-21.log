@@ -1,0 +1,181 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  WebCore -> C:\71Degrees\repos\WebCore\src\WebCore\bin\Debug\net10.0\WebCore.dll
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(94,81): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(83,83): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(103,79): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(105,83): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(137,79): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(139,97): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(122,79): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(128,83): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(164,80): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(165,81): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(169,115): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(172,112): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(181,79): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(186,88): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(204,96): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(205,100): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(149,79): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(152,110): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(154,87): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(156,116): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(225,120): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+  WebCore.Tests -> C:\71Degrees\repos\WebCore\tests\WebCore.Tests\bin\Debug\net10.0\WebCore.Tests.dll
+Test run for C:\71Degrees\repos\WebCore\tests\WebCore.Tests\bin\Debug\net10.0\WebCore.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+[xUnit.net 00:00:00.28]     WebCore.Tests.Adversarial.AccountPrimitivesAdversarialTests.PasswordHasher_NonPositiveIterationCount_IsRefusedNotThrown_Finding(hash: "0.AAAAAAAAAAAAAAAAAAAAAA==.AAAAAAAAAAAAAAAAAAAAAAA"···) [FAIL]
+[xUnit.net 00:00:00.28]     WebCore.Tests.Adversarial.LimitersAndTimingAdversarialTests.KeyedRateLimiter_FloodOfDistinctKeys_DoesNotResetAnExistingKey_Finding [FAIL]
+[xUnit.net 00:00:00.28]     WebCore.Tests.Adversarial.AccountPrimitivesAdversarialTests.PasswordHasher_NonPositiveIterationCount_IsRefusedNotThrown_Finding(hash: "-1.AAAAAAAAAAAAAAAAAAAAAA==.AAAAAAAAAAAAAAAAAAAAAA"···) [FAIL]
+[xUnit.net 00:00:00.28]     WebCore.Tests.Adversarial.AccountPrimitivesAdversarialTests.PasswordHasher_EmptyKeyPart_IsFalse_Finding [FAIL]
+  Failed WebCore.Tests.Adversarial.AccountPrimitivesAdversarialTests.PasswordHasher_NonPositiveIterationCount_IsRefusedNotThrown_Finding(hash: "0.AAAAAAAAAAAAAAAAAAAAAA==.AAAAAAAAAAAAAAAAAAAAAAA"···) [1 ms]
+  Error Message:
+   System.ArgumentOutOfRangeException : iterations ('0') must be a non-negative and non-zero value. (Parameter 'iterations')
+Actual value was 0.
+  Stack Trace:
+     at System.ArgumentOutOfRangeException.ThrowNegativeOrZero[T](T value, String paramName)
+   at System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero[T](T value, String paramName)
+   at System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(ReadOnlySpan`1 password, ReadOnlySpan`1 salt, Int32 iterations, HashAlgorithmName hashAlgorithm, Int32 outputLength)
+   at System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(String password, Byte[] salt, Int32 iterations, HashAlgorithmName hashAlgorithm, Int32 outputLength)
+   at WebCore.Accounts.PasswordHasher.Verify(String password, String hash) in C:\71Degrees\repos\WebCore\src\WebCore\Accounts\PasswordHasher.cs:line 61
+   at WebCore.Tests.Adversarial.AccountPrimitivesAdversarialTests.PasswordHasher_NonPositiveIterationCount_IsRefusedNotThrown_Finding(String hash) in C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountPrimitivesAdversarialTests.cs:line 149
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+  Failed WebCore.Tests.Adversarial.LimitersAndTimingAdversarialTests.KeyedRateLimiter_FloodOfDistinctKeys_DoesNotResetAnExistingKey_Finding [3 ms]
+  Error Message:
+   Assert.False() Failure
+Expected: False
+Actual:   True
+  Stack Trace:
+     at WebCore.Tests.Adversarial.LimitersAndTimingAdversarialTests.KeyedRateLimiter_FloodOfDistinctKeys_DoesNotResetAnExistingKey_Finding() in C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\LimitersAndTimingAdversarialTests.cs:line 104
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed WebCore.Tests.Adversarial.AccountPrimitivesAdversarialTests.PasswordHasher_NonPositiveIterationCount_IsRefusedNotThrown_Finding(hash: "-1.AAAAAAAAAAAAAAAAAAAAAA==.AAAAAAAAAAAAAAAAAAAAAA"···) [< 1 ms]
+  Error Message:
+   System.ArgumentOutOfRangeException : iterations ('-1') must be a non-negative and non-zero value. (Parameter 'iterations')
+Actual value was -1.
+  Stack Trace:
+     at System.ArgumentOutOfRangeException.ThrowNegativeOrZero[T](T value, String paramName)
+   at System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero[T](T value, String paramName)
+   at System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(ReadOnlySpan`1 password, ReadOnlySpan`1 salt, Int32 iterations, HashAlgorithmName hashAlgorithm, Int32 outputLength)
+   at System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(String password, Byte[] salt, Int32 iterations, HashAlgorithmName hashAlgorithm, Int32 outputLength)
+   at WebCore.Accounts.PasswordHasher.Verify(String password, String hash) in C:\71Degrees\repos\WebCore\src\WebCore\Accounts\PasswordHasher.cs:line 61
+   at WebCore.Tests.Adversarial.AccountPrimitivesAdversarialTests.PasswordHasher_NonPositiveIterationCount_IsRefusedNotThrown_Finding(String hash) in C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountPrimitivesAdversarialTests.cs:line 149
+   at InvokeStub_AccountPrimitivesAdversarialTests.PasswordHasher_NonPositiveIterationCount_IsRefusedNotThrown_Finding(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+  Failed WebCore.Tests.Adversarial.AccountPrimitivesAdversarialTests.PasswordHasher_EmptyKeyPart_IsFalse_Finding [< 1 ms]
+  Error Message:
+   Assert.False() Failure
+Expected: False
+Actual:   True
+  Stack Trace:
+     at WebCore.Tests.Adversarial.AccountPrimitivesAdversarialTests.PasswordHasher_EmptyKeyPart_IsFalse_Finding() in C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountPrimitivesAdversarialTests.cs:line 169
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.28]     WebCore.Tests.Adversarial.SettingsContrastGeminiAdversarialTests.CssContrast_Ratio_ThreeDigitHex_IsAccepted_Finding [FAIL]
+[xUnit.net 00:00:00.28]     WebCore.Tests.Adversarial.SettingsContrastGeminiAdversarialTests.GeminiApi_ArrayIn_ReplyWithStrayBrackets_StillFindsTheArray_Finding [FAIL]
+  Failed WebCore.Tests.Adversarial.SettingsContrastGeminiAdversarialTests.CssContrast_Ratio_ThreeDigitHex_IsAccepted_Finding [1 ms]
+  Error Message:
+   System.ArgumentOutOfRangeException : Specified argument was out of the range of valid values. (Parameter 'start')
+  Stack Trace:
+     at WebCore.Accessibility.CssContrast.<Luminance>g__Channel|16_0(Int32 start, <>c__DisplayClass16_0&) in C:\71Degrees\repos\WebCore\src\WebCore\Accessibility\CssContrast.cs:line 187
+   at WebCore.Accessibility.CssContrast.Luminance(String hex) in C:\71Degrees\repos\WebCore\src\WebCore\Accessibility\CssContrast.cs:line 191
+   at WebCore.Accessibility.CssContrast.Ratio(String foreground, String background) in C:\71Degrees\repos\WebCore\src\WebCore\Accessibility\CssContrast.cs:line 49
+   at WebCore.Tests.Adversarial.SettingsContrastGeminiAdversarialTests.CssContrast_Ratio_ThreeDigitHex_IsAccepted_Finding() in C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\SettingsContrastGeminiAdversarialTests.cs:line 340
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed WebCore.Tests.Adversarial.SettingsContrastGeminiAdversarialTests.GeminiApi_ArrayIn_ReplyWithStrayBrackets_StillFindsTheArray_Finding [5 ms]
+  Error Message:
+   Assert.Single() Failure: The collection was empty
+  Stack Trace:
+     at WebCore.Tests.Adversarial.SettingsContrastGeminiAdversarialTests.GeminiApi_ArrayIn_ReplyWithStrayBrackets_StillFindsTheArray_Finding() in C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\SettingsContrastGeminiAdversarialTests.cs:line 402
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.28]     WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.HealthSignal_HugeExpectation_DoesNotThrowWhenJudged_Finding [FAIL]
+[xUnit.net 00:00:00.36]     WebCore.Tests.Adversarial.AccountEmailAdversarialTests.PerEmailLimit_SurvivesAFloodOfOtherClients_Finding [FAIL]
+[xUnit.net 00:00:00.36]     WebCore.Tests.Adversarial.AccountEmailAdversarialTests.Options_ZeroPerClientCeiling_IsRefusedAtConstruction_Finding [FAIL]
+[xUnit.net 00:00:00.36]     WebCore.Tests.Adversarial.AccountEmailAdversarialTests.PasswordReset_KnownAndUnknownAddresses_AnswerTheSameWhenRateLimited_Finding [FAIL]
+[xUnit.net 00:00:00.37]     WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.Sparkline_StrokeWithQuotes_CannotBreakOutOfTheAttribute_Finding [FAIL]
+  Failed WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.HealthSignal_HugeExpectation_DoesNotThrowWhenJudged_Finding [3 ms]
+  Error Message:
+   Assert.Null() Failure: Value is not null
+Expected: null
+Actual:   System.OverflowException: TimeSpan overflowed because the duration is too long.
+   at System.TimeSpan.IntervalFromDoubleTicks(Double ticks)
+   at WebCore.Health.HealthSignal.IsStale(DateTimeOffset now) in C:\71Degrees\repos\WebCore\src\WebCore\Health\HealthSignal.cs:line 51
+   at WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.<>c__DisplayClass35_0.<HealthSignal_HugeExpectation_DoesNotThrowWhenJudged_Finding>b__0() in C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AuditHealthOperationsAdversarialTests.cs:line 366
+   at Xunit.Record.Exception(Func`1 testCode) in /_/src/xunit.core/Record.cs:line 47
+  Stack Trace:
+     at WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.HealthSignal_HugeExpectation_DoesNotThrowWhenJudged_Finding() in C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AuditHealthOperationsAdversarialTests.cs:line 366
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed WebCore.Tests.Adversarial.AccountEmailAdversarialTests.PerEmailLimit_SurvivesAFloodOfOtherClients_Finding [131 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: RateLimited
+Actual:   Sent
+  Stack Trace:
+     at WebCore.Tests.Adversarial.AccountEmailAdversarialTests.PerEmailLimit_SurvivesAFloodOfOtherClients_Finding() in C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs:line 225
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed WebCore.Tests.Adversarial.AccountEmailAdversarialTests.Options_ZeroPerClientCeiling_IsRefusedAtConstruction_Finding [< 1 ms]
+  Error Message:
+   Assert.Throws() Failure: No exception was thrown
+Expected: typeof(System.ArgumentOutOfRangeException)
+  Stack Trace:
+     at WebCore.Tests.Adversarial.AccountEmailAdversarialTests.Options_ZeroPerClientCeiling_IsRefusedAtConstruction_Finding() in C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs:line 237
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed WebCore.Tests.Adversarial.AccountEmailAdversarialTests.PasswordReset_KnownAndUnknownAddresses_AnswerTheSameWhenRateLimited_Finding [1 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: Sent
+Actual:   RateLimited
+  Stack Trace:
+     at WebCore.Tests.Adversarial.AccountEmailAdversarialTests.PasswordReset_KnownAndUnknownAddresses_AnswerTheSameWhenRateLimited_Finding() in C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs:line 208
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.Sparkline_StrokeWithQuotes_CannotBreakOutOfTheAttribute_Finding [5 ms]
+  Error Message:
+   Assert.DoesNotContain() Failure: Sub-string found
+                                ↓ (pos 115)
+String: ···""none" stroke="red" onload="alert(1)" str"···
+Found:  "onload"
+  Stack Trace:
+     at WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.Sparkline_StrokeWithQuotes_CannotBreakOutOfTheAttribute_Finding() in C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AuditHealthOperationsAdversarialTests.cs:line 560
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.38]     WebCore.Tests.Adversarial.AccountEmailAdversarialTests.Confirm_FiveWrongGuessesInParallel_AllowsNoMoreThanFiveGuesses_Finding [FAIL]
+[xUnit.net 00:00:00.42]     WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.AuditLog_ForgetOwner_RemovesTheirActionsFromOtherOwnersItemHistories_Finding [FAIL]
+[xUnit.net 00:00:00.43]     WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.AuditActorContext_OverlappingScopesDisposedOutOfOrder_RestoreTheRightActor_Finding [FAIL]
+  Failed WebCore.Tests.Adversarial.AccountEmailAdversarialTests.Confirm_FiveWrongGuessesInParallel_AllowsNoMoreThanFiveGuesses_Finding [19 ms]
+  Error Message:
+   Assert.True() Failure
+Expected: True
+Actual:   False
+  Stack Trace:
+     at WebCore.Tests.Adversarial.AccountEmailAdversarialTests.Confirm_FiveWrongGuessesInParallel_AllowsNoMoreThanFiveGuesses_Finding() in C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs:line 189
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.AuditLog_ForgetOwner_RemovesTheirActionsFromOtherOwnersItemHistories_Finding [47 ms]
+  Error Message:
+   Assert.DoesNotContain() Failure: Filter matched in collection
+             ↓ (pos 0)
+Collection: [AuditEntry { At = 11/21/2026 9:00:00 AM +00:00, Actor = AuditActor { Id = forgotten, Name = Gone, Source = web, TraceId = , Path =  }, Kind = song, EntityId = s1, EntityName = Song, OwnerId = someone-else, Action = changed, Changes = System.Collections.Generic.List`1[WebCore.Audit.AuditChange] }]
+  Stack Trace:
+     at WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.AuditLog_ForgetOwner_RemovesTheirActionsFromOtherOwnersItemHistories_Finding() in C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AuditHealthOperationsAdversarialTests.cs:line 243
+--- End of stack trace from previous location ---
+  Failed WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.AuditActorContext_OverlappingScopesDisposedOutOfOrder_RestoreTheRightActor_Finding [< 1 ms]
+  Error Message:
+   Assert.Equal() Failure: Strings differ
+           ↓ (pos 0)
+Expected: "system"
+Actual:   "outer"
+           ↑ (pos 0)
+  Stack Trace:
+     at WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.AuditActorContext_OverlappingScopesDisposedOutOfOrder_RestoreTheRightActor_Finding() in C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AuditHealthOperationsAdversarialTests.cs:line 144
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+
+Failed!  - Failed:    14, Passed:    26, Skipped:     0, Total:    40, Duration: 200 ms - WebCore.Tests.dll (net10.0)

@@ -1,0 +1,30 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  WebCore -> C:\71Degrees\repos\WebCore\src\WebCore\bin\Debug\net10.0\WebCore.dll
+  WebCore.Hosting -> C:\71Degrees\repos\WebCore\src\WebCore.Hosting\bin\Debug\net10.0\WebCore.Hosting.dll
+  WebCore.Hosting.Tests -> C:\71Degrees\repos\WebCore\tests\WebCore.Hosting.Tests\bin\Debug\net10.0\WebCore.Hosting.Tests.dll
+Test run for C:\71Degrees\repos\WebCore\tests\WebCore.Hosting.Tests\bin\Debug\net10.0\WebCore.Hosting.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+[xUnit.net 00:00:00.20]     WebCore.Hosting.Tests.Adversarial.EdgeHostingAdversarialTests.Csp_SourceWithASemicolon_CanInjectAnotherDirective_Finding [FAIL]
+[xUnit.net 00:00:00.21]     WebCore.Hosting.Tests.Adversarial.EdgeHostingAdversarialTests.ProbePaths_TraversalHiddenUnderWellKnown_SlipsThroughTheExemption_Finding [FAIL]
+  Failed WebCore.Hosting.Tests.Adversarial.EdgeHostingAdversarialTests.Csp_SourceWithASemicolon_CanInjectAnotherDirective_Finding [6 ms]
+  Error Message:
+   Assert.DoesNotContain() Failure: Sub-string found
+                                ↓ (pos 57)
+String: ···" https://cdn.example; script-src 'unsafe-"···
+Found:  "; script-src 'unsafe-inline'"
+  Stack Trace:
+     at WebCore.Hosting.Tests.Adversarial.EdgeHostingAdversarialTests.Csp_SourceWithASemicolon_CanInjectAnotherDirective_Finding() in C:\71Degrees\repos\WebCore\tests\WebCore.Hosting.Tests\Adversarial\EdgeHostingAdversarialTests.cs:line 305
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed WebCore.Hosting.Tests.Adversarial.EdgeHostingAdversarialTests.ProbePaths_TraversalHiddenUnderWellKnown_SlipsThroughTheExemption_Finding [2 ms]
+  Error Message:
+   Assert.True() Failure
+Expected: True
+Actual:   False
+  Stack Trace:
+     at WebCore.Hosting.Tests.Adversarial.EdgeHostingAdversarialTests.ProbePaths_TraversalHiddenUnderWellKnown_SlipsThroughTheExemption_Finding() in C:\71Degrees\repos\WebCore\tests\WebCore.Hosting.Tests\Adversarial\EdgeHostingAdversarialTests.cs:line 136
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+
+Failed!  - Failed:     2, Passed:     0, Skipped:     0, Total:     2, Duration: 10 ms - WebCore.Hosting.Tests.dll (net10.0)

@@ -1,0 +1,83 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  WebCore -> C:\71Degrees\repos\WebCore\src\WebCore\bin\Debug\net10.0\WebCore.dll
+  WebCore.Hosting -> C:\71Degrees\repos\WebCore\src\WebCore.Hosting\bin\Debug\net10.0\WebCore.Hosting.dll
+  WebCore.Deploy -> C:\71Degrees\repos\WebCore\src\WebCore.Deploy\bin\Debug\net10.0\WebCore.Deploy.dll
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(94,81): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(103,79): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(105,83): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(122,79): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(128,83): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(137,79): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(139,97): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(149,79): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(152,110): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(154,87): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(156,116): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(164,80): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(165,81): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(169,115): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(172,112): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(181,79): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(186,88): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(204,96): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(205,100): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(83,83): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+C:\71Degrees\repos\WebCore\tests\WebCore.Tests\Adversarial\AccountEmailAdversarialTests.cs(225,120): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [C:\71Degrees\repos\WebCore\tests\WebCore.Tests\WebCore.Tests.csproj]
+  WebCore.Tests -> C:\71Degrees\repos\WebCore\tests\WebCore.Tests\bin\Debug\net10.0\WebCore.Tests.dll
+Test run for C:\71Degrees\repos\WebCore\tests\WebCore.Tests\bin\Debug\net10.0\WebCore.Tests.dll (.NETCoreApp,Version=v10.0)
+  WebCore.Deploy.Tests -> C:\71Degrees\repos\WebCore\tests\WebCore.Deploy.Tests\bin\Debug\net10.0\WebCore.Deploy.Tests.dll
+Test run for C:\71Degrees\repos\WebCore\tests\WebCore.Deploy.Tests\bin\Debug\net10.0\WebCore.Deploy.Tests.dll (.NETCoreApp,Version=v10.0)
+  WebCore.UI -> C:\71Degrees\repos\WebCore\src\WebCore.UI\bin\Debug\net10.0\WebCore.UI.dll
+  WebCore.Hosting.Tests -> C:\71Degrees\repos\WebCore\tests\WebCore.Hosting.Tests\bin\Debug\net10.0\WebCore.Hosting.Tests.dll
+Test run for C:\71Degrees\repos\WebCore\tests\WebCore.Hosting.Tests\bin\Debug\net10.0\WebCore.Hosting.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+A total of 1 test files matched the specified pattern.
+  WebCore.UI.Tests -> C:\71Degrees\repos\WebCore\tests\WebCore.UI.Tests\bin\Debug\net10.0\WebCore.UI.Tests.dll
+Test run for C:\71Degrees\repos\WebCore\tests\WebCore.UI.Tests\bin\Debug\net10.0\WebCore.UI.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+A total of 1 test files matched the specified pattern.
+[xUnit.net 00:00:00.43]     WebCore.Hosting.Tests.Adversarial.EdgeHostingAdversarialTests.Csp_SourceWithASemicolon_CanInjectAnotherDirective_Finding [SKIP]
+  Skipped WebCore.Hosting.Tests.Adversarial.EdgeHostingAdversarialTests.Csp_SourceWithASemicolon_CanInjectAnotherDirective_Finding [1 ms]
+[xUnit.net 00:00:00.43]     WebCore.Hosting.Tests.Adversarial.EdgeHostingAdversarialTests.ProbePaths_TraversalHiddenUnderWellKnown_SlipsThroughTheExemption_Finding [SKIP]
+  Skipped WebCore.Hosting.Tests.Adversarial.EdgeHostingAdversarialTests.ProbePaths_TraversalHiddenUnderWellKnown_SlipsThroughTheExemption_Finding [1 ms]
+[xUnit.net 00:00:00.59]     WebCore.Tests.Adversarial.AccountPrimitivesAdversarialTests.PasswordHasher_NonPositiveIterationCount_IsRefusedNotThrown_Finding [SKIP]
+  Skipped WebCore.Tests.Adversarial.AccountPrimitivesAdversarialTests.PasswordHasher_NonPositiveIterationCount_IsRefusedNotThrown_Finding [1 ms]
+[xUnit.net 00:00:00.67]     WebCore.Tests.Adversarial.AccountEmailAdversarialTests.PerEmailLimit_SurvivesAFloodOfOtherClients_Finding [SKIP]
+  Skipped WebCore.Tests.Adversarial.AccountEmailAdversarialTests.PerEmailLimit_SurvivesAFloodOfOtherClients_Finding [1 ms]
+[xUnit.net 00:00:00.68]     WebCore.Tests.Adversarial.AccountEmailAdversarialTests.Options_ZeroPerClientCeiling_IsRefusedAtConstruction_Finding [SKIP]
+  Skipped WebCore.Tests.Adversarial.AccountEmailAdversarialTests.Options_ZeroPerClientCeiling_IsRefusedAtConstruction_Finding [1 ms]
+[xUnit.net 00:00:00.70]     WebCore.Tests.Adversarial.SettingsContrastGeminiAdversarialTests.CssContrast_Ratio_ThreeDigitHex_IsAccepted_Finding [SKIP]
+  Skipped WebCore.Tests.Adversarial.SettingsContrastGeminiAdversarialTests.CssContrast_Ratio_ThreeDigitHex_IsAccepted_Finding [1 ms]
+[xUnit.net 00:00:00.70]     WebCore.Tests.Adversarial.AccountEmailAdversarialTests.PasswordReset_KnownAndUnknownAddresses_AnswerTheSameWhenRateLimited_Finding [SKIP]
+[xUnit.net 00:00:00.70]     WebCore.Tests.Adversarial.AccountEmailAdversarialTests.Confirm_FiveWrongGuessesInParallel_AllowsNoMoreThanFiveGuesses_Finding [SKIP]
+  Skipped WebCore.Tests.Adversarial.AccountEmailAdversarialTests.PasswordReset_KnownAndUnknownAddresses_AnswerTheSameWhenRateLimited_Finding [1 ms]
+  Skipped WebCore.Tests.Adversarial.AccountEmailAdversarialTests.Confirm_FiveWrongGuessesInParallel_AllowsNoMoreThanFiveGuesses_Finding [1 ms]
+[xUnit.net 00:00:00.71]     WebCore.Tests.Adversarial.LimitersAndTimingAdversarialTests.KeyedRateLimiter_FloodOfDistinctKeys_DoesNotResetAnExistingKey_Finding [SKIP]
+  Skipped WebCore.Tests.Adversarial.LimitersAndTimingAdversarialTests.KeyedRateLimiter_FloodOfDistinctKeys_DoesNotResetAnExistingKey_Finding [1 ms]
+[xUnit.net 00:00:00.73]     WebCore.Tests.Adversarial.SettingsContrastGeminiAdversarialTests.GeminiApi_ArrayIn_ReplyWithStrayBrackets_StillFindsTheArray_Finding [SKIP]
+  Skipped WebCore.Tests.Adversarial.SettingsContrastGeminiAdversarialTests.GeminiApi_ArrayIn_ReplyWithStrayBrackets_StillFindsTheArray_Finding [1 ms]
+[xUnit.net 00:00:00.77]     WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.HealthSignal_HugeExpectation_DoesNotThrowWhenJudged_Finding [SKIP]
+  Skipped WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.HealthSignal_HugeExpectation_DoesNotThrowWhenJudged_Finding [1 ms]
+[xUnit.net 00:00:00.86]     WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.Sparkline_StrokeWithQuotes_CannotBreakOutOfTheAttribute_Finding [SKIP]
+  Skipped WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.Sparkline_StrokeWithQuotes_CannotBreakOutOfTheAttribute_Finding [1 ms]
+[xUnit.net 00:00:00.88]     WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.AuditLog_ForgetOwner_RemovesTheirActionsFromOtherOwnersItemHistories_Finding [SKIP]
+  Skipped WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.AuditLog_ForgetOwner_RemovesTheirActionsFromOtherOwnersItemHistories_Finding [1 ms]
+[xUnit.net 00:00:00.93]     WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.AuditActorContext_OverlappingScopesDisposedOutOfOrder_RestoreTheRightActor_Finding [SKIP]
+  Skipped WebCore.Tests.Adversarial.AuditHealthOperationsAdversarialTests.AuditActorContext_OverlappingScopesDisposedOutOfOrder_RestoreTheRightActor_Finding [1 ms]
+
+Passed!  - Failed:     0, Passed:   142, Skipped:     2, Total:   144, Duration: 423 ms - WebCore.Hosting.Tests.dll (net10.0)
+
+Passed!  - Failed:     0, Passed:   110, Skipped:     0, Total:   110, Duration: 509 ms - WebCore.Deploy.Tests.dll (net10.0)
+[xUnit.net 00:00:04.45]     WebCore.Tests.Adversarial.AccountPrimitivesAdversarialTests.PasswordHasher_EmptyKeyPart_IsFalse_Finding [SKIP]
+  Skipped WebCore.Tests.Adversarial.AccountPrimitivesAdversarialTests.PasswordHasher_EmptyKeyPart_IsFalse_Finding [1 ms]
+
+Passed!  - Failed:     0, Passed:     6, Skipped:     0, Total:     6, Duration: 545 ms - WebCore.UI.Tests.dll (net10.0)
+
+Passed!  - Failed:     0, Passed:   670, Skipped:    13, Total:   683, Duration: 10 s - WebCore.Tests.dll (net10.0)
+
+Attachments:
+  C:\Users\patrick.johnson.GLOBALINFORMATI\AppData\Local\Temp\claude\f40e3d0651bdd4a8\9de25f0e-4ddc-42f8-9be5-5608269b37d3\scratchpad\cov2\c353ae6f-2ad9-4e6c-8861-64f3eeeb7baf\coverage.cobertura.xml
+  C:\Users\patrick.johnson.GLOBALINFORMATI\AppData\Local\Temp\claude\f40e3d0651bdd4a8\9de25f0e-4ddc-42f8-9be5-5608269b37d3\scratchpad\cov2\b6a2d60b-f040-486b-936c-5673e1b3e149\coverage.cobertura.xml
+  C:\Users\patrick.johnson.GLOBALINFORMATI\AppData\Local\Temp\claude\f40e3d0651bdd4a8\9de25f0e-4ddc-42f8-9be5-5608269b37d3\scratchpad\cov2\4df9a365-55b0-43c8-bfbc-46ee1da93c4c\coverage.cobertura.xml
+  C:\Users\patrick.johnson.GLOBALINFORMATI\AppData\Local\Temp\claude\f40e3d0651bdd4a8\9de25f0e-4ddc-42f8-9be5-5608269b37d3\scratchpad\cov2\82afc608-a7f4-45d2-908c-39a60d7e93af\coverage.cobertura.xml
