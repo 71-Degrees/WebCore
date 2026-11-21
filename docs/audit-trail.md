@@ -12,7 +12,7 @@ after (`AuditDiff`). A save that changed nothing writes nothing. Writing the tra
 Kept in the app's own `audit` store: `item-{kind}-{id}.json` per item, `owner-{id}.json` per owner (only when the entry names one), `actor-{id}.json` per actor (the
 item histories that actor wrote into, so forgetting them needs no listing) and `recent.json`, each capped (`AuditLogOptions`: 200 per item, 500 per owner, 1000
 recent) and entries older than 180 days dropped as they are written. `ForgetOwnerAsync` ("delete my data") removes every entry the person owns: their own list, their
-items' histories and the recent list. Their actions on other owners' items stay, with the actor anonymised (id `forgotten`, name kept, trace id and path cleared), so the
+items' histories and the recent list. Their actions on other owners' items stay, with the actor anonymised (id `forgotten`, name kept, trace id and path cleared; for a web actor the name is the account's email address, kept on purpose: the owner's decision of 2026-11-21), so the
 other owner's history keeps its shape. Entries written before the actor index existed are found through the person's own items and the recent list only; the rest age
 out with `KeepFor`.
 
