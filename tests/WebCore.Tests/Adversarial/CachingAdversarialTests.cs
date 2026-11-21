@@ -209,11 +209,13 @@ public sealed class CachingAdversarialTests
     }
 
     [Fact]
-    public void StaticAssetCachePolicy_ExemptTable_IsMutableBehindItsReadOnlyType_Finding()
+    public void StaticAssetCachePolicy_ExemptTable_CannotBeEditedByACast()
     {
-        // The public table is typed IReadOnlyDictionary but backed by a mutable Dictionary. Only the flag is checked:
-        // writing through a cast would change a process-wide policy that other test classes read.
-        Assert.False(((IDictionary<string, string>)StaticAssetCachePolicy.Exempt).IsReadOnly);
+        // The table is frozen, so a cast either fails (it is not an IDictionary at all) or reports read-only.
+        // Only the flag is checked: writing through a cast would change a process-wide policy that other test classes read.
+        var asWritable = StaticAssetCachePolicy.Exempt as IDictionary<string, string>;
+
+        Assert.True(asWritable is null || asWritable.IsReadOnly);
     }
 
     // ---- StorageCalls proxy ----

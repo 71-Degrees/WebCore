@@ -19,7 +19,8 @@ public sealed class NullEmailSender(ILogger<NullEmailSender> logger) : IEmailSen
 {
     public Task SendAsync(string toEmail, string subject, string htmlBody, CancellationToken cancellationToken = default)
     {
-        logger.LogWarning("Email not sent (no email provider configured): {Subject} -> {ToEmail}", subject, toEmail);
+        // A log is not the place for a full address: it is kept for the people who read logs, not for the recipient.
+        logger.LogWarning("Email not sent (no email provider configured): {Subject} -> {To}", subject, EmailMask.Mask(toEmail));
         return Task.CompletedTask;
     }
 }

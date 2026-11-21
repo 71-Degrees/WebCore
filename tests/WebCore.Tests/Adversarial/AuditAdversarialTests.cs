@@ -184,11 +184,19 @@ public sealed class AuditAdversarialTests : IDisposable
     }
 
     [Fact]
-    public async Task AuditLog_NegativeKeep_FailsOnAppend_BecauseNoOptionValidation_Finding()
+    public void AuditLog_NegativeKeep_IsRefusedAtConstruction()
     {
-        var log = NewLog(new AuditLogOptions { KeepRecent = -1 });
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => NewLog(new AuditLogOptions { KeepRecent = -1 }));
 
-        await Assert.ThrowsAnyAsync<ArgumentOutOfRangeException>(() => log.AppendAsync(Entry("thing", "e1", null)));
+        Assert.Equal(nameof(AuditLogOptions.KeepRecent), ex.ParamName);
+    }
+
+    [Fact]
+    public void AuditLog_ZeroKeepFor_IsRefusedAtConstruction()
+    {
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => NewLog(new AuditLogOptions { KeepFor = TimeSpan.Zero }));
+
+        Assert.Equal(nameof(AuditLogOptions.KeepFor), ex.ParamName);
     }
 
     [Fact]

@@ -29,7 +29,7 @@ public sealed partial class AuditLog(IKeyedDocumentStore store, TimeProvider tim
 {
     private const string RecentName = "recent.json";
 
-    private readonly AuditLogOptions _options = options ?? new AuditLogOptions();
+    private readonly AuditLogOptions _options = Validated(options ?? new AuditLogOptions());
     private readonly SemaphoreSlim _turn = new(1, 1);
 
     public async Task AppendAsync(AuditEntry entry, CancellationToken cancellationToken = default)
@@ -83,6 +83,18 @@ public sealed partial class AuditLog(IKeyedDocumentStore store, TimeProvider tim
     }
 
     public void Dispose() => _turn.Dispose();
+
+    // Refused at construction: a negative keep would otherwise fail on the first append, long after the bad setting was made.
+    // A keep of zero is allowed and means "keep none of that list".
+    private static AuditLogOptions Validated(AuditLogOptions options)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(options.KeepPerItem, nameof(AuditLogOptions.KeepPerItem));
+        ArgumentOutOfRangeException.ThrowIfNegative(options.KeepPerOwner, nameof(AuditLogOptions.KeepPerOwner));
+        ArgumentOutOfRangeException.ThrowIfNegative(options.KeepRecent, nameof(AuditLogOptions.KeepRecent));
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.KeepFor, TimeSpan.Zero, nameof(AuditLogOptions.KeepFor));
+
+        return options;
+    }
 
     private static bool Concerns(AuditEntry entry, string ownerId) => entry.OwnerId == ownerId || entry.Actor.Id == ownerId;
 

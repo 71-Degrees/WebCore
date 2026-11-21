@@ -4,6 +4,8 @@
  * ---------------------------------------------------------------------------
  */
 
+using System.Collections.Frozen;
+
 namespace WebCore.Caching;
 
 /// <summary>
@@ -19,15 +21,19 @@ public static class StaticAssetCachePolicy
     private static readonly HashSet<string> HashedTypes = new(StringComparer.OrdinalIgnoreCase) { ".css", ".js" };
     private static readonly HashSet<string> RarelyChangingTypes = new(StringComparer.OrdinalIgnoreCase) { ".woff2", ".woff", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".webp" };
 
+    // Frozen, not a plain dictionary behind a read-only type: a cast to IDictionary must not be able to change the process-wide policy.
     /// <summary>File types deliberately left with only an ETag (revalidated each time), and why.</summary>
-    public static readonly IReadOnlyDictionary<string, string> Exempt = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-    {
-        [".html"] = "about.html is served by the /about endpoint, which rewrites the host name per request",
-        [".json"] = "manifests and data files: small, and they change with each deploy",
-        [".txt"] = "robots.txt style files: tiny and must reflect the current environment",
-        [".ogg"] = "spoken clips (a mascot's narration): re-rendered whenever the voice is tuned, so they revalidate by ETag instead of being kept for a month",
-        [".xml"] = "BingSiteAuth.xml, the Bing Webmaster Tools ownership token: a few bytes, fetched rarely, and it must keep answering as it is",
-    };
+    public static readonly IReadOnlyDictionary<string, string> Exempt = BuildExempt();
+
+    private static IReadOnlyDictionary<string, string> BuildExempt() =>
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [".html"] = "about.html is served by the /about endpoint, which rewrites the host name per request",
+            [".json"] = "manifests and data files: small, and they change with each deploy",
+            [".txt"] = "robots.txt style files: tiny and must reflect the current environment",
+            [".ogg"] = "spoken clips (a mascot's narration): re-rendered whenever the voice is tuned, so they revalidate by ETag instead of being kept for a month",
+            [".xml"] = "BingSiteAuth.xml, the Bing Webmaster Tools ownership token: a few bytes, fetched rarely, and it must keep answering as it is",
+        }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The Cache-Control value for a served file, or null when it keeps only its ETag.</summary>
     public static string? For(string fileName, bool addressCarriesContentHash)

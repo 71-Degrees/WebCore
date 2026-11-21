@@ -76,33 +76,33 @@ public sealed class AccountEmailAdversarialTests
     [InlineData("")]
     [InlineData("   ")]
     [InlineData(null)]
-    public void Request_BlankOrNullClientKey_IsInvalidEmailAndNothingIsSent(string? clientKey)
+    public async Task Request_BlankOrNullClientKey_IsInvalidEmailAndNothingIsSent(string? clientKey)
     {
         var fixture = new Fixture(deliveryConfigured: true);
 
-        var result = fixture.Service.RequestSignInCodeAsync("a@b.co", clientKey!).Result;
+        var result = await fixture.Service.RequestSignInCodeAsync("a@b.co", clientKey!);
 
         Assert.Equal(EmailRequestStatus.InvalidEmail, result.Status);
         Assert.Empty(fixture.Sender.Sent);
     }
 
     [Fact]
-    public void Request_WithNoDeliveryAndNoDevelopmentExposure_IsUnavailable()
+    public async Task Request_WithNoDeliveryAndNoDevelopmentExposure_IsUnavailable()
     {
         var fixture = new Fixture(deliveryConfigured: false, exposeCode: false);
 
-        var result = fixture.Service.RequestSignInCodeAsync("a@b.co", "client").Result;
+        var result = await fixture.Service.RequestSignInCodeAsync("a@b.co", "client");
 
         Assert.Equal(EmailRequestStatus.Unavailable, result.Status);
     }
 
     [Fact]
-    public void Request_EmailIsCaseInsensitive_SoACodeAskedForInCapitalsIsConfirmedInLower()
+    public async Task Request_EmailIsCaseInsensitive_SoACodeAskedForInCapitalsIsConfirmedInLower()
     {
         var fixture = new Fixture(deliveryConfigured: false, exposeCode: true);
-        var code = fixture.Service.RequestSignInCodeAsync("A@B.CO", "client").Result.DevCode!;
+        var code = (await fixture.Service.RequestSignInCodeAsync("A@B.CO", "client")).DevCode!;
 
-        var result = fixture.Service.ConfirmSignInAsync("a@b.co", "client", code).Result;
+        var result = await fixture.Service.ConfirmSignInAsync("a@b.co", "client", code);
 
         Assert.Equal(CodeCheckStatus.Confirmed, result.Status);
     }
@@ -116,69 +116,71 @@ public sealed class AccountEmailAdversarialTests
     [InlineData("1234567")]
     [InlineData("12 345 6")]
     [InlineData("１２３４５６")]
-    public void Confirm_MissingOrMalformedCode_IsWrongNotAnError(string? code)
+    public async Task Confirm_MissingOrMalformedCode_IsWrongNotAnError(string? code)
     {
         var fixture = new Fixture(deliveryConfigured: false, exposeCode: true);
-        var real = fixture.Service.RequestSignInCodeAsync("a@b.co", "client").Result.DevCode!;
+        var real = (await fixture.Service.RequestSignInCodeAsync("a@b.co", "client")).DevCode!;
         if (code == real)
         {
             return;
         }
 
-        var result = fixture.Service.ConfirmSignInAsync("a@b.co", "client", code).Result;
+        var result = await fixture.Service.ConfirmSignInAsync("a@b.co", "client", code);
 
         Assert.Equal(CodeCheckStatus.WrongCode, result.Status);
     }
 
     [Fact]
-    public void Confirm_CodeWithSurroundingSpaces_IsTrimmedAndAccepted()
+    public async Task Confirm_CodeWithSurroundingSpaces_IsTrimmedAndAccepted()
     {
         var fixture = new Fixture(deliveryConfigured: false, exposeCode: true);
-        var code = fixture.Service.RequestSignInCodeAsync("a@b.co", "client").Result.DevCode!;
+        var code = (await fixture.Service.RequestSignInCodeAsync("a@b.co", "client")).DevCode!;
 
-        var result = fixture.Service.ConfirmSignInAsync("a@b.co", "client", "  " + code + "\t").Result;
+        var result = await fixture.Service.ConfirmSignInAsync("a@b.co", "client", "  " + code + "\t");
 
         Assert.Equal(CodeCheckStatus.Confirmed, result.Status);
     }
 
     [Fact]
-    public void Confirm_CodeIsValidUpToTenMinutesAndExpiresOneTickLater()
+    public async Task Confirm_CodeIsValidUpToTenMinutesAndExpiresOneTickLater()
     {
         var clock = new MutableClock(Start);
         var fixture = new Fixture(deliveryConfigured: false, exposeCode: true, clock: clock);
-        var code = fixture.Service.RequestSignInCodeAsync("a@b.co", "client").Result.DevCode!;
+        var code = (await fixture.Service.RequestSignInCodeAsync("a@b.co", "client")).DevCode!;
 
         clock.Now = Start.AddMinutes(10);
-        Assert.Equal(CodeCheckStatus.Confirmed, fixture.Service.ConfirmSignInAsync("a@b.co", "client", code).Result.Status);
+        Assert.Equal(CodeCheckStatus.Confirmed, (await fixture.Service.ConfirmSignInAsync("a@b.co", "client", code)).Status);
 
-        var secondRequest = fixture.Service.RequestSignInCodeAsync("a@b.co", "other").Result.DevCode!;
+        var secondRequest = (await fixture.Service.RequestSignInCodeAsync("a@b.co", "other")).DevCode!;
         clock.Now = Start.AddMinutes(10).AddMinutes(10).AddTicks(1);
-        Assert.Equal(CodeCheckStatus.Expired, fixture.Service.ConfirmSignInAsync("a@b.co", "other", secondRequest).Result.Status);
+        Assert.Equal(CodeCheckStatus.Expired, (await fixture.Service.ConfirmSignInAsync("a@b.co", "other", secondRequest)).Status);
     }
 
     [Fact]
-    public void Confirm_AfterAFreshRequest_TheOlderCodeNoLongerWorks()
+    public async Task Confirm_AfterAFreshRequest_TheOlderCodeNoLongerWorks()
     {
         // Each request for the same email and browser replaces the pending code.
         var fixture = new Fixture(deliveryConfigured: false, exposeCode: true);
-        var first = fixture.Service.RequestSignInCodeAsync("a@b.co", "client").Result.DevCode!;
-        var second = fixture.Service.RequestSignInCodeAsync("a@b.co", "client").Result.DevCode!;
+        var first = (await fixture.Service.RequestSignInCodeAsync("a@b.co", "client")).DevCode!;
+        var second = (await fixture.Service.RequestSignInCodeAsync("a@b.co", "client")).DevCode!;
 
         if (first != second)
         {
-            Assert.Equal(CodeCheckStatus.WrongCode, fixture.Service.ConfirmSignInAsync("a@b.co", "client", first).Result.Status);
+            Assert.Equal(CodeCheckStatus.WrongCode, (await fixture.Service.ConfirmSignInAsync("a@b.co", "client", first)).Status);
         }
 
-        Assert.Equal(CodeCheckStatus.Confirmed, fixture.Service.ConfirmSignInAsync("a@b.co", "client", second).Result.Status);
+        Assert.Equal(CodeCheckStatus.Confirmed, (await fixture.Service.ConfirmSignInAsync("a@b.co", "client", second)).Status);
     }
 
+    // The parallel burst is the point of this test: it needs real threads, so it blocks on each call inside AsParallel.
+#pragma warning disable xUnit1031
     [Fact]
-    public void Confirm_FiveWrongGuessesInParallel_AllowsNoMoreThanFiveGuesses()
+    public async Task Confirm_FiveWrongGuessesInParallel_AllowsNoMoreThanFiveGuesses()
     {
         // A burst of parallel guesses must not all read a low count: the guess count is incremented atomically.
         // Only five wrong answers are allowed; the rest should be TooManyAttempts.
         var fixture = new Fixture(deliveryConfigured: false, exposeCode: true);
-        var real = fixture.Service.RequestSignInCodeAsync("a@b.co", "client").Result.DevCode!;
+        var real = (await fixture.Service.RequestSignInCodeAsync("a@b.co", "client")).DevCode!;
         var wrong = real == "000000" ? "111111" : "000000";
 
         var results = Enumerable.Range(0, 300)
@@ -188,13 +190,14 @@ public sealed class AccountEmailAdversarialTests
 
         Assert.True(results.Count(s => s == CodeCheckStatus.WrongCode) <= 5);
     }
+#pragma warning restore xUnit1031
 
     [Fact]
     public async Task Confirm_TwoCorrectAnswersInParallel_OnlyOneConfirms()
     {
         // A code is single-use even when two correct confirmations race: only the call that removes it confirms.
         var fixture = new Fixture(deliveryConfigured: false, exposeCode: true);
-        var real = fixture.Service.RequestSignInCodeAsync("a@b.co", "client").Result.DevCode!;
+        var real = (await fixture.Service.RequestSignInCodeAsync("a@b.co", "client")).DevCode!;
 
         var results = await Task.WhenAll(
             fixture.Service.ConfirmSignInAsync("a@b.co", "client", real),
@@ -206,7 +209,7 @@ public sealed class AccountEmailAdversarialTests
     // ---- Account enumeration and limiter edges ----
 
     [Fact]
-    public void PasswordReset_KnownAndUnknownAddresses_AnswerTheSameWhenRateLimited()
+    public async Task PasswordReset_KnownAndUnknownAddresses_AnswerTheSameWhenRateLimited()
     {
         var fixture = new Fixture(deliveryConfigured: true);
         fixture.Users.Add(new User { Email = "known@b.co", EmailVerifiedAt = Start });
@@ -215,29 +218,29 @@ public sealed class AccountEmailAdversarialTests
         EmailRequestResult? unknownLast = null;
         for (var i = 0; i < 8; i++)
         {
-            knownLast = fixture.Service.RequestPasswordResetAsync("known@b.co", "client-" + i).Result;
-            unknownLast = fixture.Service.RequestPasswordResetAsync("unknown@b.co", "client-" + i).Result;
+            knownLast = await fixture.Service.RequestPasswordResetAsync("known@b.co", "client-" + i);
+            unknownLast = await fixture.Service.RequestPasswordResetAsync("unknown@b.co", "client-" + i);
         }
 
         Assert.Equal(unknownLast!.Status, knownLast!.Status);
     }
 
     [Fact]
-    public void PerEmailLimit_SurvivesAFloodOfOtherClients()
+    public async Task PerEmailLimit_SurvivesAFloodOfOtherClients()
     {
         // Finding F-E2: 6000 distinct keys really fill the 5000-key tables, and the victim's five uses must survive that.
         var fixture = new Fixture(deliveryConfigured: false, exposeCode: true, maxPerHour: 100_000, maxPerDay: 100_000);
         for (var i = 0; i < 5; i++)
         {
-            fixture.Service.RequestSignInCodeAsync("victim@b.co", "victim-" + i);
+            await fixture.Service.RequestSignInCodeAsync("victim@b.co", "victim-" + i);
         }
 
         for (var i = 0; i < 6000; i++)
         {
-            fixture.Service.RequestSignInCodeAsync("flood" + i + "@b.co", "bot-" + i);
+            await fixture.Service.RequestSignInCodeAsync("flood" + i + "@b.co", "bot-" + i);
         }
 
-        Assert.Equal(EmailRequestStatus.RateLimited, fixture.Service.RequestSignInCodeAsync("victim@b.co", "victim-6").Result.Status);
+        Assert.Equal(EmailRequestStatus.RateLimited, (await fixture.Service.RequestSignInCodeAsync("victim@b.co", "victim-6")).Status);
     }
 
     [Fact]

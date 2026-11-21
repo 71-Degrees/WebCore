@@ -15,6 +15,9 @@ namespace WebCore.Accounts;
 /// </summary>
 public static class LocalReturnUrl
 {
+    /// <summary>The longest return URL kept; a longer one becomes "/". Nothing legitimate is that long, and the value ends up in a redirect header.</summary>
+    public const int MaxLength = 2048;
+
     public static string Sanitize(string? returnUrl)
     {
         if (string.IsNullOrWhiteSpace(returnUrl))
@@ -23,6 +26,12 @@ public static class LocalReturnUrl
         }
 
         var candidate = returnUrl.Trim();
+        // Checked straight after the trim so an oversized value never reaches the later checks.
+        if (candidate.Length > MaxLength)
+        {
+            return "/";
+        }
+
         if (candidate.Any(char.IsControl) || candidate.StartsWith('\\'))
         {
             return "/";

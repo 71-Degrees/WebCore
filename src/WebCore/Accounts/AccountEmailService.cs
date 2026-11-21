@@ -194,19 +194,8 @@ public sealed class AccountEmailService : IDisposable
         return trimmed.ToLowerInvariant();
     }
 
-    /// <summary>"sa***@example.com": the first two letters and the domain, enough to tell two players with the
-    /// same display name apart wherever an address is shown publicly, without publishing it.</summary>
-    public static string MaskEmail(string email)
-    {
-        var at = email.IndexOf('@');
-        if (at <= 0)
-        {
-            return "***";
-        }
-
-        var shown = at <= 2 ? 1 : 2;
-        return email[..shown] + "***" + email[at..];
-    }
+    /// <summary>Masks an address for display; the rule lives in <see cref="EmailMask"/>.</summary>
+    public static string MaskEmail(string email) => EmailMask.Mask(email);
 
     /// <summary>Signing in by code, step one: sends a code to the address.
     /// <paramref name="clientKey"/> identifies the requesting browser and must be the same one used to confirm.</summary>

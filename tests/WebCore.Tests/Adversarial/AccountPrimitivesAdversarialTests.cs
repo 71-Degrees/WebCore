@@ -270,12 +270,21 @@ public sealed class AccountPrimitivesAdversarialTests
     }
 
     [Fact]
-    public void LocalReturnUrl_HugeInput_IsReturnedWithoutALengthCap_Finding()
+    public void LocalReturnUrl_OverLongInput_IsRoot()
     {
-        // No length limit: a 64 KB return URL passes straight through into a redirect header. Recorded, not endorsed.
+        // A 64 KB return URL would otherwise pass straight into a redirect header; anything past the cap collapses to "/".
         var huge = "/" + new string('a', 65_536);
 
-        Assert.Equal(huge, LocalReturnUrl.Sanitize(huge));
+        Assert.Equal("/", LocalReturnUrl.Sanitize(huge));
+    }
+
+    [Fact]
+    public void LocalReturnUrl_AtMaxLength_IsKept()
+    {
+        var atLimit = "/" + new string('a', LocalReturnUrl.MaxLength - 1);
+
+        Assert.Equal(LocalReturnUrl.MaxLength, atLimit.Length);
+        Assert.Equal(atLimit, LocalReturnUrl.Sanitize(atLimit));
     }
 
     // ---- DisplayNames ----
