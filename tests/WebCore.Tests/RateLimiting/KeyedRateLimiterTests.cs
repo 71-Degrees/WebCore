@@ -44,18 +44,20 @@ public class KeyedRateLimiterTests
     }
 
     [Fact]
-    public void Memory_is_bounded_by_clearing_the_table_when_too_many_keys_arrive()
+    public void Memory_is_bounded_by_forgetting_the_least_used_key_when_too_many_keys_arrive()
     {
-        var limiter = new KeyedRateLimiter(1, TimeSpan.FromMinutes(10), maxTrackedKeys: 3);
-        for (var i = 0; i < 3; i++)
-        {
-            limiter.TryAcquire("k" + i, Start);
-        }
+        // Memory stays bounded by forgetting one least-used key, not by clearing the table (finding F-R1): k0 keeps its two uses.
+        var limiter = new KeyedRateLimiter(2, TimeSpan.FromMinutes(10), maxTrackedKeys: 3);
+        limiter.TryAcquire("k0", Start);
+        limiter.TryAcquire("k0", Start);
+        limiter.TryAcquire("k1", Start);
+        limiter.TryAcquire("k2", Start);
 
         Assert.Equal(3, limiter.TrackedKeys);
-        limiter.TryAcquire("one-more", Start);
+        Assert.True(limiter.TryAcquire("one-more", Start));
 
-        Assert.Equal(1, limiter.TrackedKeys);   // cleared, then the new key was recorded
+        Assert.True(limiter.TrackedKeys <= 3);
+        Assert.False(limiter.TryAcquire("k0", Start));
     }
 
     [Fact]

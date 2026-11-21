@@ -19,6 +19,7 @@ public class SlidingWindowRateLimiter
     private readonly TimeProvider _time;
     private readonly object _lock = new();
     private readonly Queue<DateTimeOffset> _timestamps = new();
+    private DateTimeOffset _lastSeen;
 
     public SlidingWindowRateLimiter(int maxInWindow, TimeSpan window, TimeProvider? timeProvider = null)
     {
@@ -32,6 +33,18 @@ public class SlidingWindowRateLimiter
         _time = timeProvider ?? TimeProvider.System;
     }
 
+    /// <summary>When this limiter was last asked, allowed or refused: a refused attempt is still activity, so an abused key stays recent.</summary>
+    public DateTimeOffset LastSeen
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _lastSeen;
+            }
+        }
+    }
+
     /// <summary>Attempts to record one occurrence of the action now. Returns false if the window is full.</summary>
     public bool TryAcquire(DateTimeOffset? now = null)
     {
@@ -39,10 +52,8 @@ public class SlidingWindowRateLimiter
 
         lock (_lock)
         {
-            while (_timestamps.Count > 0 && n - _timestamps.Peek() > _window)
-            {
-                _timestamps.Dequeue();
-            }
+            _lastSeen = n;
+            Prune(n);
 
             if (_timestamps.Count >= _maxInWindow)
             {
@@ -51,6 +62,25 @@ public class SlidingWindowRateLimiter
 
             _timestamps.Enqueue(n);
             return true;
+        }
+    }
+
+    /// <summary>How many uses are still inside the window at <paramref name="now"/>. Used by a keyed table to choose which key to forget.</summary>
+    public int CountInWindow(DateTimeOffset now)
+    {
+        lock (_lock)
+        {
+            Prune(now);
+            return _timestamps.Count;
+        }
+    }
+
+    // Callers hold _lock. Drops the uses that have aged out of the window, so both TryAcquire and CountInWindow see the same state.
+    private void Prune(DateTimeOffset now)
+    {
+        while (_timestamps.Count > 0 && now - _timestamps.Peek() > _window)
+        {
+            _timestamps.Dequeue();
         }
     }
 }

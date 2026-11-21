@@ -30,6 +30,8 @@ public sealed class KeyedCache<TKey, TValue> where TKey : notnull where TValue :
     /// <param name="now">An older way to control the clock in a test; <paramref name="timeProvider"/> is the standard one and wins when this is not given.</param>
     public KeyedCache(string name, TimeSpan timeToLive, Func<DateTimeOffset>? now = null, Func<TValue, TValue>? copy = null, int maxEntries = 1000, TimeProvider? timeProvider = null)
     {
+        // A cap below one would make MakeRoom empty the cache on every new key; refuse it as a configuration error.
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxEntries, 1);
         _counters = CacheRegistry.For(name);
         _timeToLive = timeToLive;
         _now = now ?? (timeProvider ?? TimeProvider.System).GetUtcNow;

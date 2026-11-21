@@ -34,16 +34,9 @@ public sealed class CachingAdversarialTests
     }
 
     [Fact]
-    public void KeyedCache_ZeroMaximumEntries_HoldsExactlyOneEntry_NotNone()
+    public void KeyedCache_ZeroMaximumEntries_IsRefusedAtConstruction()
     {
-        // The size check keeps at least one entry (Math.Max(1, max/10)), so a limit of zero behaves as one.
-        var cache = new KeyedCache<string, string>("adv.keyed.max0", TimeSpan.FromMinutes(5), () => Start, maxEntries: 0);
-        cache.Set("first", "1", cache.Generation);
-        cache.Set("second", "2", cache.Generation);
-
-        Assert.False(cache.TryGet("first", out _));
-        Assert.True(cache.TryGet("second", out var second));
-        Assert.Equal("2", second);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new KeyedCache<string, string>("adv.keyed.max0", TimeSpan.FromMinutes(5), () => Start, maxEntries: 0));
     }
 
     [Fact]

@@ -35,10 +35,13 @@ public sealed class AccountAttemptLimiter
     public AccountAttemptLimiter(int scale = 1, int? globalMax = null)
     {
         var factor = Math.Max(1, scale);
-        _global = new SlidingWindowRateLimiter(maxInWindow: Math.Max(1, globalMax ?? DefaultGlobalMax) * factor, window: TimeSpan.FromMinutes(10));
-        _perAddress = new KeyedRateLimiter(maxInWindow: 10 * factor, window: TimeSpan.FromMinutes(10));
-        _perAccount = new KeyedRateLimiter(maxInWindow: 10 * factor, window: TimeSpan.FromMinutes(15));
+        _global = new SlidingWindowRateLimiter(maxInWindow: Scaled(Math.Max(1, globalMax ?? DefaultGlobalMax), factor), window: TimeSpan.FromMinutes(10));
+        _perAddress = new KeyedRateLimiter(maxInWindow: Scaled(10, factor), window: TimeSpan.FromMinutes(10));
+        _perAccount = new KeyedRateLimiter(maxInWindow: Scaled(10, factor), window: TimeSpan.FromMinutes(15));
     }
+
+    // A large scale must clamp to the largest ceiling, not wrap negative: a wrapped ceiling is refused at construction.
+    private static int Scaled(int baseline, int factor) => (int)Math.Min(int.MaxValue, (long)baseline * factor);
 
     /// <summary>A registration attempt: allowed when this address has attempts left and the shared ceiling has room.</summary>
     public bool TryAcquire(string? address) => TryAcquireAddress(address) && _global.TryAcquire();

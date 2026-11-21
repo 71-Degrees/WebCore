@@ -93,10 +93,13 @@ public sealed class LimitersAndTimingAdversarialTests
         Assert.True(limiter.TryAcquire("addr", Start));
     }
 
-    [Fact(Skip = "FINDING F-R1 (security): when the key table is full it is cleared, so a flood of distinct keys resets every key's limit")]
-    public void KeyedRateLimiter_FloodOfDistinctKeys_DoesNotResetAnExistingKey_Finding()
+    [Fact]
+    public void KeyedRateLimiter_FloodOfDistinctKeys_DoesNotResetAnExistingKey()
     {
-        var limiter = new KeyedRateLimiter(1, TimeSpan.FromMinutes(10), maxTrackedKeys: 2);
+        // Finding F-R1: the victim used its three uses and must keep them when a flood of new keys arrives.
+        var limiter = new KeyedRateLimiter(3, TimeSpan.FromMinutes(10), maxTrackedKeys: 2);
+        Assert.True(limiter.TryAcquire("victim", Start));
+        Assert.True(limiter.TryAcquire("victim", Start));
         Assert.True(limiter.TryAcquire("victim", Start));
         Assert.True(limiter.TryAcquire("other1", Start));
         Assert.True(limiter.TryAcquire("bot", Start));
@@ -105,24 +108,33 @@ public sealed class LimitersAndTimingAdversarialTests
     }
 
     [Fact]
-    public void KeyedRateLimiter_FloodOfDistinctKeys_ClearsTheTable_AsRecorded()
+    public void KeyedRateLimiter_AFullTable_ForgetsIdleKeysFirst()
     {
         var limiter = new KeyedRateLimiter(1, TimeSpan.FromMinutes(10), maxTrackedKeys: 2);
-        limiter.TryAcquire("victim", Start);
-        limiter.TryAcquire("other1", Start);
+        limiter.TryAcquire("old", Start);
+        limiter.TryAcquire("a", Start.AddMinutes(11));
 
-        limiter.TryAcquire("bot", Start);
+        limiter.TryAcquire("b", Start.AddMinutes(11));
 
-        Assert.Equal(1, limiter.TrackedKeys);
+        Assert.Equal(2, limiter.TrackedKeys);
+        Assert.False(limiter.TryAcquire("a", Start.AddMinutes(11)));
+    }
+
+    [Fact]
+    public void KeyedRateLimiter_ZeroTrackedKeys_IsRefusedAtConstruction()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new KeyedRateLimiter(1, TimeSpan.FromMinutes(10), maxTrackedKeys: 0));
     }
 
     // ---- AccountAttemptLimiter ----
 
     [Fact]
-    public void AccountAttemptLimiter_ScaleOfIntMaxValue_OverflowsTheCeilingAndIsRefused()
+    public void AccountAttemptLimiter_ScaleOfIntMaxValue_IsClampedNotOverflowed()
     {
-        // 10 * int.MaxValue wraps negative, and the window limiter rejects that at construction.
-        Assert.ThrowsAny<ArgumentOutOfRangeException>(() => new AccountAttemptLimiter(scale: int.MaxValue));
+        // 10 * int.MaxValue would wrap negative; the ceiling is clamped to int.MaxValue instead.
+        var limiter = new AccountAttemptLimiter(scale: int.MaxValue);
+
+        Assert.True(limiter.TryAcquireAddress("1.2.3.4"));
     }
 
     [Fact]

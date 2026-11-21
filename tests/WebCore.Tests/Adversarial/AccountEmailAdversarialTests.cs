@@ -222,16 +222,17 @@ public sealed class AccountEmailAdversarialTests
         Assert.Equal(unknownLast!.Status, knownLast!.Status);
     }
 
-    [Fact(Skip = "FINDING F-E2 (security): flooding more than 5000 distinct client keys clears every limiter, resetting a victim's per-email limit")]
-    public void PerEmailLimit_SurvivesAFloodOfOtherClients_Finding()
+    [Fact]
+    public void PerEmailLimit_SurvivesAFloodOfOtherClients()
     {
+        // Finding F-E2: 6000 distinct keys really fill the 5000-key tables, and the victim's five uses must survive that.
         var fixture = new Fixture(deliveryConfigured: false, exposeCode: true, maxPerHour: 100_000, maxPerDay: 100_000);
         for (var i = 0; i < 5; i++)
         {
             fixture.Service.RequestSignInCodeAsync("victim@b.co", "victim-" + i);
         }
 
-        for (var i = 0; i < 3000; i++)
+        for (var i = 0; i < 6000; i++)
         {
             fixture.Service.RequestSignInCodeAsync("flood" + i + "@b.co", "bot-" + i);
         }
