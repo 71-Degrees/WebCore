@@ -91,9 +91,9 @@ public sealed class EdgeHostingAdversarialTests : IDisposable
     public void ApiKeyGate_NonAsciiKey_MatchesByUtf8Bytes()
     {
         var http = new DefaultHttpContext();
-        http.Request.Headers["X-Api-Key"] = "clé-secrète";
+        http.Request.Headers["X-Api-Key"] = "cl\u00e9-secr\u00e8te";
 
-        Assert.Null(new ApiKeyGate("clé-secrète").Check(http));
+        Assert.Null(new ApiKeyGate("cl\u00e9-secr\u00e8te").Check(http));
     }
 
     // ---- ProbePaths ----

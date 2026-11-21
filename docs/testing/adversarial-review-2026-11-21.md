@@ -120,3 +120,67 @@ Every finding test above is now live (unskipped) and passing; the "recorded" tes
 | F-AU2 | (dropped) | Tested misuse (scopes disposed out of order); the test was removed. |
 
 Still open: the Hosting endpoint files, WebCore.Deploy and WebCore.UI were not probed. The apps' own tests that use ManualTimeProvider (CrateDigger, TriviaNight) should be run at the next WebCore submodule bump.
+
+## Second pass: Hosting endpoints (2026-11-21)
+
+Scope: the endpoint files the first pass did not reach, `src/WebCore.Hosting`: `Accounts/AccountEndpoints.cs`, `Accounts/AdminUserEndpoints.cs`,
+`Accounts/PasswordEndpoints.cs`, `Health/HealthEndpoints.cs`, `Security/FormAntiforgery.cs`, `Audit/AuditTrailRegistration.cs`. Nothing in `src` was changed.
+
+Method: a `TestServer` (package `Microsoft.AspNetCore.TestHost` **10.0.12**, added to `tests/WebCore.Hosting.Tests` only, matching the shared framework 10.0.12)
+runs the real endpoints with temp-folder stores, an ephemeral data-protection provider and a recording mail sender (no network, no real blob store). A
+small cookie jar keeps the sign-in and antiforgery cookies, so the probes sign in for real: password, emailed code, masquerade. Shared host setup is in
+`tests/WebCore.Hosting.Tests/Adversarial/EndpointSite.cs`.
+
+Files (`tests/WebCore.Hosting.Tests/Adversarial/`):
+
+| File | Lines | Cases | Passing | Skipped (findings) |
+|---|---|---|---|---|
+| `EndpointSite.cs` (shared host helper, no tests) | 286 | - | - | - |
+| `AccountEndpointsAdversarialTests.cs` | 650 | 68 | 67 | 1 |
+| `AdminAndPasswordEndpointsAdversarialTests.cs` | 533 | 47 | 46 | 1 |
+| `HealthAndAuditEndpointsAdversarialTests.cs` | 635 | 63 | 57 | 6 |
+| **Total** | | **178** | **170** | **8** |
+
+Whole hosting test project after this pass: 334 total, 326 pass, 8 skipped, 0 failed. `dotnet build WebCore.slnx`: 0 errors.
+
+Every skipped test was first run unskipped and failed (the actual value is in the evidence column). The `_AsRecorded` tests pass and pin a questionable choice.
+
+### Findings
+
+| ID | Sev | File | What happens | Evidence |
+|---|---|---|---|---|
+| F-W1 | Medium | `src/WebCore.Hosting/Health/HealthEndpoints.cs` (`PutReportAsync`) | A chunked report upload (no `Content-Length`) over 2 MB is read whole into memory before the size check; `HealthReportStore.SaveAsync` then throws, so the answer is a 500, not a 413. The early check only sees `Content-Length`. | run unskipped: failed with `ArgumentException: The report is 2,097,153 bytes; the most kept is 2,097,152` |
+| F-W2 | Medium | `src/WebCore.Hosting/Audit/AuditTrailRegistration.cs` (`AuditActors.From`) | While an admin masquerades, the audit actor is the account being viewed, not the admin who made the change, so the trail names the wrong person. The masquerade's original-admin claim is ignored. | run unskipped: failed with `Expected "u1", Actual "u2"` |
+| F-W3 | Low | `HealthEndpoints.cs` (`Clamp`, link rule) | A signal link of `/\evil.example` passes (starts with `/`, not `//`); browsers read it as `//evil.example`, so the dashboard link leaves the site. Needs the publish key. | run unskipped: failed with `Actual "/\\evil.example"` (stored) |
+| F-W4 | Low | `HealthEndpoints.cs` (`Clamp`), `HealthSignalStore` | `expectedEveryHours` of `1e400` parses to +Infinity and the store's JSON write throws, so the publish is a 500 and nothing is stored. `IsStale` already guards infinity; the write does not. | run unskipped: failed with `ArgumentException: .NET number values such as positive and negative infinity cannot be written as valid JSON` |
+| F-W5 | Low | `src/WebCore.Hosting/Accounts/AdminUserEndpoints.cs` (`TryGetProfileAsync`) | A 1000-character user id reaches the file store; the `IOException` (file name too long) is not caught (only `ArgumentException` is), so an admin form answers 500 instead of `error=unknown`. Shared helper: masquerade and disable take the same path (not separately run). | run unskipped: failed with `IOException: The filename, directory name, or volume label syntax is incorrect` |
+| F-W6 | Low | `AccountEndpoints.cs` (`RegisterAsync`) and `WebCore/Accounts/DisplayNames.cs` (`IsValid`) | A display name with a control character (`Sam\u0001Eve`) is accepted and the account is created; `Tidy` only collapses whitespace. | run unskipped: failed with redirect `/` (account created, no error) |
+| F-W7 | Low | `HealthEndpoints.cs` (signal id via `DocumentNames.IsValid`) | No length cap on a signal id; a 1000-character id is stored as a dictionary key with every publication. | run unskipped: failed with `Expected BadRequest, Actual OK` |
+| F-W8 | Low | `HealthEndpoints.cs` (publish) | A numeric status outside the enum (`"Status": 7`) is accepted (`JsonStringEnumConverter` allows integers) and stored. | run unskipped: failed with `Expected BadRequest, Actual OK` |
+
+### Recorded behaviour (passing, questionable but deliberate or harmless)
+
+- `Login_SchemeInReturnUrl_StaysOnThisSiteAsAPath_AsRecorded`: `https://evil.example` becomes `/https://evil.example`, a path on this host. Not an open redirect, but `LocalReturnUrl`'s comment says a scheme collapses to `/`.
+- `Login_NulInAFormValue_IsRefusedWith400_AsRecorded`: a NUL byte anywhere in a form value gets 400 with no redirect. Safe; nothing signs in.
+- `Register_ExistingEmail_SaysSoAndRevealsTheAccount_AsRecorded`: registration says "already registered", so it reveals whether an address has an account (the sign-in and reset forms do not).
+- `Register_OversizedEmailIsEchoedIntoTheRedirect_AsRecorded`: a 64 KB address is echoed into the redirect URL (only when the app keeps emails in URLs).
+- `Login_DisabledAccountWithTheRightPassword_SaysDisabled_AsRecorded`: "disabled" is named only after the right password.
+- `StaleAnonymousTokenOnLoginSubmit_AfterSignIn_GoesHome_AsRecorded`: a token issued to an anonymous visitor, posted once signed in, sends the visitor home rather than an error page.
+- `AdminDisable_AnythingOtherThanLowerCaseTrue_ReEnables_AsRecorded`: `disabled=TRUE`, or a missing field, re-enables the account. Admin-only and CSRF-protected.
+- `ChangePassword_AccountWithoutAPassword_NeedsNoCurrentOne_AsRecorded`: an account made by emailed code sets its first password without a current one.
+- `Publish_DuplicateIdsInOnePublication_KeepTheLast_AsRecorded`: `accepted` counts both, the store keeps the last.
+- `FormGate_WithoutTheAntiforgeryServiceRegistered_FailsLoudly_AsRecorded`: a host that maps the form endpoints without `AddAntiforgery` gets an exception on each post (fails closed, but only at request time, not at startup).
+
+Confirmed as correct (passing, named after the input): logout and every form endpoint refuse GET, a missing or forged token, a token from another browser and JSON bodies; sign-in gives one answer for unknown, wrong and no-password accounts; return URLs `//`, `/\`, control characters and over 2048 characters go home, and 2048 is kept; the emailed-code limits (five guesses, the eleventh request limited, a code bound to its browser); reset-send gives the same answer for known and unknown addresses, including the rate limit; the health key gate (401 wrong or missing, 503 unset); `Clamp` cuts headline, detail, unit, and moves a future `AsOf` to now; the 2 MB report limit with a `Content-Length`; the masquerade rules (not while masquerading, not for self, unknown or disabled targets, a masquerading member cannot use admin forms); masquerade stop restores the admin; a changed password ends the session it was made from.
+
+### Not probed
+
+- Real Kestrel: everything ran on `TestServer` over http. Kestrel's own request-size and form-count limits, Secure cookies over https, and the real `Content-Length` handling are not exercised.
+- `HealthWatchdog` and the alert path: the watchdog ran as a hosted service but its pass was not driven; no notifier was registered, so `HealthAlertDispatcher` and `NtfyNotifier` (outbound HTTP) were not exercised.
+- Email failure branches: `SendFailed` and `Unavailable` for emailed codes were not driven (only the recording sender).
+- Session judging while masquerading: an admin disabled while masquerading, and "resume" when the admin account is gone (`AccountSessionEvents`), were not driven.
+- `AuditCircuitHandler` (the Blazor circuit actor) and an end-to-end masquerade through `UseAuditActors` (only `AuditActors.From` and anonymous requests).
+- Cross-user antiforgery (a token issued to a second signed-in user).
+- Read endpoints of the health dashboard and report page (only the PUT write door was in these files).
+- `WebCore.Deploy` and `WebCore.UI`: still not probed.
+- Note, outside this pass: `tests/WebCore.Hosting.Tests/Adversarial/EdgeHostingAdversarialTests.cs` (first pass) contains non-ASCII characters in string literals (`clé-secrète`); it is not touched here.
