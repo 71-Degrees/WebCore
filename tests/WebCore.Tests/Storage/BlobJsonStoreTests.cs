@@ -15,14 +15,9 @@ public class BlobJsonStoreTests
     private static BlobJsonStore CreateStore() =>
         new(BlobTestConnection.ConnectionString!, "test-blob-json-store");
 
-    [Fact]
+    [BlobFact]
     public async Task SetAsync_ThenGetAsync_RoundTrips()
     {
-        if (!BlobTestConnection.RequireOrSkip())
-        {
-            return;
-        }
-
         var store = CreateStore();
         var blobName = $"{Guid.NewGuid():N}.json";
         try
@@ -39,28 +34,18 @@ public class BlobJsonStoreTests
         }
     }
 
-    [Fact]
+    [BlobFact]
     public async Task GetAsync_UnknownBlob_ReturnsNull()
     {
-        if (!BlobTestConnection.RequireOrSkip())
-        {
-            return;
-        }
-
         var store = CreateStore();
         var found = await store.GetAsync<Widget>($"no-such-{Guid.NewGuid():N}.json");
 
         Assert.Null(found);
     }
 
-    [Fact]
+    [BlobFact]
     public async Task DeleteAsync_RemovesTheBlob()
     {
-        if (!BlobTestConnection.RequireOrSkip())
-        {
-            return;
-        }
-
         var store = CreateStore();
         var blobName = $"{Guid.NewGuid():N}.json";
         await store.SetAsync(blobName, new Widget("w1", "Gadget"));
@@ -72,14 +57,9 @@ public class BlobJsonStoreTests
         Assert.Null(foundAfter);
     }
 
-    [Fact]
+    [BlobFact]
     public async Task TrySetIfNotExistsAsync_BlobAlreadyExists_ReturnsFalseAndDoesNotOverwrite()
     {
-        if (!BlobTestConnection.RequireOrSkip())
-        {
-            return;
-        }
-
         var store = CreateStore();
         var blobName = $"{Guid.NewGuid():N}.json";
         try
@@ -98,14 +78,9 @@ public class BlobJsonStoreTests
         }
     }
 
-    [Fact]
+    [BlobFact]
     public async Task ListAsync_ReturnsEveryStoredRecord()
     {
-        if (!BlobTestConnection.RequireOrSkip())
-        {
-            return;
-        }
-
         var store = CreateStore();
         var names = new[] { $"{Guid.NewGuid():N}.json", $"{Guid.NewGuid():N}.json" };
         try
@@ -132,14 +107,9 @@ public class BlobJsonStoreTests
         }
     }
 
-    [Fact]
+    [BlobFact]
     public async Task GetBytesAsync_ThenSetBytesAsync_RoundTrips()
     {
-        if (!BlobTestConnection.RequireOrSkip())
-        {
-            return;
-        }
-
         var store = CreateStore();
         var blobName = $"{Guid.NewGuid():N}.bin";
         var bytes = new byte[] { 1, 2, 3, 4, 5 };

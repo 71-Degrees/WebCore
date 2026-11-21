@@ -320,20 +320,19 @@ public sealed class LimitersAndTimingAdversarialTests
     }
 
     [Fact]
-    public void ManualTimeProvider_InfiniteTimer_FiresOnTheNextAdvance_AsRecorded_Finding()
+    public void ManualTimeProvider_InfiniteTimer_NeverFires()
     {
-        // An infinite due time is stored as now minus one millisecond, so the timer is treated as already due.
         var time = new ManualTimeProvider();
         var fired = 0;
         using var timer = time.CreateTimer(_ => fired++, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
 
-        time.Advance(TimeSpan.Zero);
+        time.Advance(TimeSpan.FromHours(1));
 
-        Assert.Equal(1, fired);
+        Assert.Equal(0, fired);
     }
 
     [Fact]
-    public void ManualTimeProvider_PeriodicTimer_FiresOnlyOnce()
+    public void ManualTimeProvider_PeriodicTimer_FiresEachPeriod()
     {
         var time = new ManualTimeProvider();
         var fired = 0;
@@ -341,6 +340,33 @@ public sealed class LimitersAndTimingAdversarialTests
 
         time.Advance(TimeSpan.FromSeconds(10));
 
-        Assert.Equal(1, fired);
+        Assert.Equal(10, fired);
+    }
+
+    [Fact]
+    public void ManualTimeProvider_ChangeAfterFiring_ReArmsTheTimer()
+    {
+        var time = new ManualTimeProvider();
+        var fired = 0;
+        using var timer = time.CreateTimer(_ => fired++, null, TimeSpan.FromSeconds(1), Timeout.InfiniteTimeSpan);
+        time.Advance(TimeSpan.FromSeconds(2));
+
+        timer.Change(TimeSpan.FromSeconds(1), Timeout.InfiniteTimeSpan);
+        time.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(2, fired);
+    }
+
+    [Fact]
+    public void ManualTimeProvider_DisposedTimer_NeverFires()
+    {
+        var time = new ManualTimeProvider();
+        var fired = 0;
+        var timer = time.CreateTimer(_ => fired++, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        timer.Dispose();
+
+        time.Advance(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(0, fired);
     }
 }
