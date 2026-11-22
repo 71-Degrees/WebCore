@@ -13,7 +13,7 @@ namespace WebCore.Caching;
 /// <see cref="SnapshotCache{T}"/>: counted under a name, callers get their own copy when <c>copy</c> is given, and a value read before a write landed is never stored.
 /// To use it: read <see cref="Generation"/>, load from the real source, then <see cref="Set"/> passing that generation back.
 /// </summary>
-public sealed class KeyedCache<TKey, TValue> where TKey : notnull where TValue : class
+public sealed class KeyedCache<TKey, TValue> : ICountsEntries where TKey : notnull where TValue : class
 {
     private readonly CacheCounters _counters;
     private readonly TimeSpan _timeToLive;
@@ -33,11 +33,15 @@ public sealed class KeyedCache<TKey, TValue> where TKey : notnull where TValue :
         // A cap below one would make MakeRoom empty the cache on every new key; refuse it as a configuration error.
         ArgumentOutOfRangeException.ThrowIfLessThan(maxEntries, 1);
         _counters = CacheRegistry.For(name);
+        _counters.Track(this);
         _timeToLive = timeToLive;
         _now = now ?? (timeProvider ?? TimeProvider.System).GetUtcNow;
         _copy = copy;
         _maxEntries = maxEntries;
     }
+
+    // Explicit, so the public surface does not grow; the registry reads it for the admin and status pages.
+    long ICountsEntries.EntryCount => _entries.Count;
 
     /// <summary>Bumped by every invalidation; pass the value read before loading back to <see cref="Set"/>.</summary>
     public int Generation => Volatile.Read(ref _generation);

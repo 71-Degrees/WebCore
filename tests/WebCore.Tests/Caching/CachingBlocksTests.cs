@@ -4,6 +4,7 @@
  * ---------------------------------------------------------------------------
  */
 
+using System.Runtime.CompilerServices;
 using WebCore.Caching;
 
 namespace WebCore.Tests.Caching;
@@ -234,6 +235,106 @@ public class CachingBlocksTests
     [Fact]
     public void Counters_HitRatioIsNullBeforeAnyRead() =>
         Assert.Null(new CacheSnapshot("x", 0, 0, 0).HitRatio);
+
+    [Fact]
+    public void Counters_AKeyedCacheReportsItsEntryCount_AndZeroAfterInvalidate()
+    {
+        var name = Name();
+        var cache = new KeyedCache<string, string>(name, TimeSpan.FromSeconds(30), () => _now);
+        cache.Set("a", "1", cache.Generation);
+        cache.Set("b", "2", cache.Generation);
+        cache.Set("c", "3", cache.Generation);
+
+        Assert.Equal<long?>(3, Row(name).Entries);
+
+        cache.Invalidate();
+
+        Assert.Equal<long?>(0, Row(name).Entries);
+    }
+
+    [Fact]
+    public async Task Counters_ASnapshotCountsTheItemsOfAHeldList_AndOneForAnyOtherValue()
+    {
+        var listName = Name();
+        var list = new SnapshotCache<List<int>>(listName, TimeSpan.FromSeconds(30), () => _now);
+        Assert.Equal<long?>(0, Row(listName).Entries);
+
+        await list.GetAsync(_ => Task.FromResult(new List<int> { 1, 2, 3, 4 }));
+        Assert.Equal<long?>(4, Row(listName).Entries);
+
+        var textName = Name();
+        var text = new SnapshotCache<string>(textName, TimeSpan.FromSeconds(30), () => _now);
+        await text.GetAsync(_ => Task.FromResult("v"));
+        Assert.Equal<long?>(1, Row(textName).Entries);
+    }
+
+    [Fact]
+    public void Counters_TwoCachesSharingOneName_SumTheirEntries()
+    {
+        var name = Name();
+        var first = new KeyedCache<string, string>(name, TimeSpan.FromSeconds(30), () => _now);
+        var second = new KeyedCache<string, string>(name, TimeSpan.FromSeconds(30), () => _now);
+        first.Set("a", "1", first.Generation);
+        first.Set("b", "2", first.Generation);
+        second.Set("c", "3", second.Generation);
+
+        Assert.Equal<long?>(3, Row(name).Entries);
+
+        GC.KeepAlive(first);
+        GC.KeepAlive(second);
+    }
+
+    [Fact]
+    public void Counters_ANameUsedOnlyForCounters_HasNoEntryCount()
+    {
+        var name = Name();
+        CacheRegistry.For(name).Hit();
+
+        Assert.Null(Row(name).Entries);
+    }
+
+    [Fact]
+    public void Report_ACustomEntry_AppearsInTheSnapshot_AndRegisteringAgainReplacesIt()
+    {
+        var name = Name();
+        CacheRegistry.Report(name, () => new CacheReport(41000, "3 rebuilds"));
+
+        var row = Row(name);
+        Assert.Equal<long?>(41000, row.Entries);
+        Assert.Equal("3 rebuilds", row.Detail);
+        Assert.Equal(0, row.Hits);
+
+        CacheRegistry.Report(name, () => new CacheReport(7, "newer"));
+
+        var rows = CacheRegistry.Snapshot().Where(s => s.Name == name).ToList();
+        Assert.Single(rows);
+        Assert.Equal<long?>(7, rows[0].Entries);
+        Assert.Equal("newer", rows[0].Detail);
+    }
+
+    [Fact]
+    public void Counters_ACacheNoLongerReferenced_StopsCounting()
+    {
+        var name = Name();
+        FillAndLetGo(name);
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        var entries = Row(name).Entries;
+        Assert.True(entries is null || entries == 0);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void FillAndLetGo(string name)
+    {
+        var cache = new KeyedCache<string, string>(name, TimeSpan.FromSeconds(30), () => _now);
+        cache.Set("a", "1", cache.Generation);
+        cache.Set("b", "2", cache.Generation);
+    }
+
+    private static CacheSnapshot Row(string name) => CacheRegistry.Snapshot().Single(s => s.Name == name);
 
     // ---- KeyedCache.GetOrLoadAsync (single flight) -------------------------------------------------------------------------------------
 

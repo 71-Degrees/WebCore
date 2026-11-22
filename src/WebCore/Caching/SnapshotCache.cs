@@ -15,7 +15,7 @@ namespace WebCore.Caching;
 /// <item>Hits, misses and invalidations are counted under <c>name</c> (see <see cref="CacheRegistry"/>).</item>
 /// </list>
 /// </summary>
-public sealed class SnapshotCache<T> : IDisposable where T : class
+public sealed class SnapshotCache<T> : IDisposable, ICountsEntries where T : class
 {
     private readonly CacheCounters _counters;
     private readonly TimeSpan _timeToLive;
@@ -32,9 +32,27 @@ public sealed class SnapshotCache<T> : IDisposable where T : class
     public SnapshotCache(string name, TimeSpan timeToLive, Func<DateTimeOffset>? now = null, Func<T, T>? copy = null, TimeProvider? timeProvider = null)
     {
         _counters = CacheRegistry.For(name);
+        _counters.Track(this);
         _timeToLive = timeToLive;
         _now = now ?? (timeProvider ?? TimeProvider.System).GetUtcNow;
         _copy = copy;
+    }
+
+    // A snapshot of a whole list is worth reporting as the list's size; any other single value counts as one.
+    long ICountsEntries.EntryCount
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _value switch
+                {
+                    null => 0,
+                    System.Collections.ICollection collection => collection.Count,
+                    _ => 1,
+                };
+            }
+        }
     }
 
     public async Task<T> GetAsync(Func<CancellationToken, Task<T>> load, CancellationToken cancellationToken = default)
