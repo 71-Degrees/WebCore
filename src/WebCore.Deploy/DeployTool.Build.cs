@@ -104,7 +104,7 @@ internal static partial class DeployTool
         }
 
         // packages.lock.json is rewritten by every restore (line endings only on Windows); it is not a change to build from, so it is ignored here.
-        var (_, dirty) = Run("git", "status --porcelain -- src ':(exclude)**/packages.lock.json'", root);
+        var (_, dirty) = Run("git", "status --porcelain -- src \":(exclude)**/packages.lock.json\"", root);
         if (!string.IsNullOrWhiteSpace(dirty) && !options.Flag("--allow-dirty"))
         {
             Console.Error.WriteLine("Uncommitted changes under src/ - commit them first so the build matches a commit (or pass --allow-dirty):\n" + dirty.TrimEnd());
