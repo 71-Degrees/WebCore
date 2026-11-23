@@ -68,15 +68,14 @@ public sealed class ITunesCatalogClient : IAlbumMetadataSource
     {
         ArgumentNullException.ThrowIfNull(name);
         var result = await GetAsync(SearchUrl + "term=" + Uri.EscapeDataString(name) + "&entity=musicArtist&limit=5", cancellationToken).ConfigureAwait(false);
-        if (result.Status != MetadataStatus.Ok)
-        {
-            return new MetadataResult<IReadOnlyList<MetadataArtist>>(result.Status);
-        }
+        return Collect(result, IsArtist, ParseArtist);
+    }
 
-        var artists = result.Data!.Where(IsArtist).Select(ParseArtist).OfType<MetadataArtist>().ToList();
-        return artists.Count == 0
-            ? new MetadataResult<IReadOnlyList<MetadataArtist>>(MetadataStatus.NotFound)
-            : new MetadataResult<IReadOnlyList<MetadataArtist>>(MetadataStatus.Ok, artists);
+    /// <summary>One album search by free text (a typed search): the studio albums iTunes ranks for those words, each with its artwork.</summary>
+    public Task<MetadataResult<IReadOnlyList<MetadataAlbum>>> SearchAlbumsByTextAsync(string text, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        return AlbumsAsync(SearchUrl + "term=" + Uri.EscapeDataString(text) + "&entity=album&limit=25", cancellationToken);
     }
 
     /// <summary>One album search by artist and title: the albums iTunes ranks for those words, each with its artwork. One call replaces an artist search and its album lists.</summary>
@@ -96,15 +95,22 @@ public sealed class ITunesCatalogClient : IAlbumMetadataSource
     private async Task<MetadataResult<IReadOnlyList<MetadataAlbum>>> AlbumsAsync(string url, CancellationToken cancellationToken)
     {
         var result = await GetAsync(url, cancellationToken).ConfigureAwait(false);
+        return Collect(result, IsStudioAlbum, ParseAlbum);
+    }
+
+    // The parsed items of a successful answer; none that parse is NotFound, and a failed answer keeps its status.
+    private static MetadataResult<IReadOnlyList<T>> Collect<T>(MetadataResult<IReadOnlyList<JsonElement>> result, Func<JsonElement, bool> keep, Func<JsonElement, T?> parse)
+        where T : class
+    {
         if (result.Status != MetadataStatus.Ok)
         {
-            return new MetadataResult<IReadOnlyList<MetadataAlbum>>(result.Status);
+            return new MetadataResult<IReadOnlyList<T>>(result.Status);
         }
 
-        var albums = result.Data!.Where(IsStudioAlbum).Select(ParseAlbum).OfType<MetadataAlbum>().ToList();
-        return albums.Count == 0
-            ? new MetadataResult<IReadOnlyList<MetadataAlbum>>(MetadataStatus.NotFound)
-            : new MetadataResult<IReadOnlyList<MetadataAlbum>>(MetadataStatus.Ok, albums);
+        var items = result.Data!.Where(keep).Select(parse).OfType<T>().ToList();
+        return items.Count == 0
+            ? new MetadataResult<IReadOnlyList<T>>(MetadataStatus.NotFound)
+            : new MetadataResult<IReadOnlyList<T>>(MetadataStatus.Ok, items);
     }
 
     private async Task<MetadataResult<IReadOnlyList<JsonElement>>> GetAsync(string url, CancellationToken cancellationToken)
