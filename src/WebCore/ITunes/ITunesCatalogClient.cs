@@ -79,6 +79,14 @@ public sealed class ITunesCatalogClient : IAlbumMetadataSource
             : new MetadataResult<IReadOnlyList<MetadataArtist>>(MetadataStatus.Ok, artists);
     }
 
+    /// <summary>One album search by artist and title: the albums iTunes ranks for those words, each with its artwork. One call replaces an artist search and its album lists.</summary>
+    public Task<MetadataResult<IReadOnlyList<MetadataAlbum>>> SearchAlbumsAsync(string artist, string title, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(artist);
+        ArgumentNullException.ThrowIfNull(title);
+        return AlbumsAsync(SearchUrl + "term=" + Uri.EscapeDataString(artist + " " + title) + "&entity=album&limit=25", cancellationToken);
+    }
+
     public Task<MetadataResult<IReadOnlyList<MetadataAlbum>>> GetArtistAlbumsAsync(string artistId, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(artistId);
