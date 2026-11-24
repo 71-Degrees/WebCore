@@ -1,9 +1,9 @@
-// @ts-check
 /*
  * ---------------------------------------------------------------------------
  * Copyright © 2026 71 Degrees. All rights reserved.
  * ---------------------------------------------------------------------------
  */
+// @ts-check
 // Colour theme: the visitor's choice of System, Light or Dark (docs/theme.md).
 // Two jobs. APPLY sets document.documentElement.dataset.theme from the saved choice; it must run from a synchronous
 // <script> in <head> (no defer, no async), so the page never paints in the wrong theme. CONTROL wires every

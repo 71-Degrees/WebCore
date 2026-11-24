@@ -1,3 +1,9 @@
+/*
+ * ---------------------------------------------------------------------------
+ * Copyright © 2026 71 Degrees. All rights reserved.
+ * ---------------------------------------------------------------------------
+ */
+
 using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Builder;

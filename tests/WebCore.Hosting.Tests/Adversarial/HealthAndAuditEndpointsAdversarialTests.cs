@@ -1,3 +1,9 @@
+/*
+ * ---------------------------------------------------------------------------
+ * Copyright © 2026 71 Degrees. All rights reserved.
+ * ---------------------------------------------------------------------------
+ */
+
 using System.Net;
 using static WebCore.Hosting.Tests.Adversarial.EndpointSite;
 using System.Security.Claims;
