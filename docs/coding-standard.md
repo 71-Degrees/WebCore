@@ -71,7 +71,7 @@ Exceptions are exceptional, so when one happens it is documented: logged, with w
 
 ## Enforcement
 
-- `dotnet run --project tools/CodeQuality/src/Quality` (and the pre-push check) compares against `quality/baseline.json`. New or worse smells fail the push. The baseline only ever shrinks: update it to lock in an improvement. Accepting
+- `dotnet C:\71Degrees\published\quality\bin\Quality.dll` (and the pre-push check) compares against `quality/baseline.json`. New or worse smells fail the push. The baseline only ever shrinks: update it to lock in an improvement. Accepting
   a new finding on purpose is the owner's call, made explicitly, with the reason in the commit.
 - `.NET analyzers` at Recommended level run in every build (Directory.Build.props) and are treated as errors once the code is clean for them; the few rules that do not fit this project are switched off in
   `.editorconfig` with a reason beside each.
@@ -82,6 +82,6 @@ Exceptions are exceptional, so when one happens it is documented: logged, with w
 - **Storage:** a repository is written once over `IDocumentStore` (JSON documents) or `IBinaryStore` (raw files); `FileDocumentStore`/`FileBinaryStore` serve development and `BlobJsonStore` serves production.
   Rules (soft delete, id checks, stamping) live in the repository, never in a store. A new kind of data is a `StoreSpec` in `StorageBackend.cs` plus one line in `StorageRegistration.cs`.
 - **Startup:** `Program.cs` only calls the modules in `src/<App>.Web/Startup/` (one short list of named steps per area: site, email, access, observability...).
-- **Empty catches:** `dotnet run --project tools/CodeQuality/src/Refactor -- log-empty-catches [--apply]` gives every empty catch in a type with a logger a debug line (owner's rule). Core services take an optional
+- **Empty catches:** `dotnet C:\71Degrees\published\quality\refactor\Refactor.dll log-empty-catches [--apply]` gives every empty catch in a type with a logger a debug line (owner's rule). Core services take an optional
   `ILogger<T>? logger = null`, so tests stay simple and production logs.
 - **Parameters:** more than seven means a small record (`DashboardOptions`, `SweepOptions`, `AccountEmailOptions`, ...), not a longer list.
