@@ -163,10 +163,12 @@ public sealed class DeployConfig
     /// <summary>The projects compiled by the pre-push check (the web app, a worker). Default: just the web project.</summary>
     public string[]? Compile { get; init; }
 
-    /// <summary>A command that lints the browser scripts (for example an eslint call), or empty for none.</summary>
+    /// <summary>A command that lints the browser scripts (for example an eslint call), or empty for none. Switched off 2026-11-24: read only when WEBCORE_REPO_SCRIPTS=1
+    /// (CodeQuality's machine-wide `scripts` lints every repo now).</summary>
     public string? ScriptLint { get; init; }
 
-    /// <summary>A command that type-checks the browser scripts, or empty for none.</summary>
+    /// <summary>A command that type-checks the browser scripts, or empty for none. Switched off 2026-11-24: read only when WEBCORE_REPO_SCRIPTS=1
+    /// (CodeQuality's machine-wide `scripts` checks every repo now).</summary>
     public string? ScriptTypeCheck { get; init; }
 
     public IndexNowSettings? IndexNow { get; init; }
