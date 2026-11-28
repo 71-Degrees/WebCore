@@ -4,6 +4,7 @@
  * ---------------------------------------------------------------------------
  */
 
+using System.Globalization;
 using System.Text.Json;
 
 namespace WebCore.Deploy;
@@ -30,7 +31,8 @@ internal static class VerifyCommands
         Console.WriteLine($"Verifying {name} ({baseUrl}):");
 
         var home = await context.GetAsync("/");
-        var outcomes = new List<VerifyOutcome> { await CheckVersionAsync(context, expected) };
+        var live = await context.GetAsync(DeployTool.Config.Endpoints.Version);
+        var outcomes = new List<VerifyOutcome> { CheckVersion(live.Status, live.Body, expected) };
         outcomes.AddRange(await GenericChecks.RunAsync(context, settings));
         foreach (var check in options.Extensions.VerifyChecks)
         {
@@ -38,7 +40,7 @@ internal static class VerifyCommands
         }
 
         outcomes.AddRange(await GenericChecks.RunSiteChecksAsync(context, settings, home));
-        outcomes.Add(CheckLoggedErrors(name, target, options));
+        outcomes.Add(CheckLoggedErrors(name, target, options, TryStartedAt(live.Body)));
         await NotifyObserversAsync(options.Extensions.VerifyObservers, context, outcomes, afterDeploy).ConfigureAwait(false);
         return Report(name, outcomes);
     }
@@ -59,13 +61,12 @@ internal static class VerifyCommands
         }
     }
 
-    private static async Task<VerifyOutcome> CheckVersionAsync(VerifyContext context, string? expected)
+    private static VerifyOutcome CheckVersion(int status, string body, string? expected)
     {
-        var live = await context.GetAsync(DeployTool.Config.Endpoints.Version);
-        var liveVersion = TryVersion(live.Body);
+        var liveVersion = TryVersion(body);
         if (liveVersion is null)
         {
-            return new(VerifyResult.Fail, "build version", $"{DeployTool.Config.Endpoints.Version} did not answer with a version (status {live.Status})");
+            return new(VerifyResult.Fail, "build version", $"{DeployTool.Config.Endpoints.Version} did not answer with a version (status {status})");
         }
 
         return expected is not null && !string.Equals(expected, liveVersion, StringComparison.Ordinal)
@@ -91,8 +92,10 @@ internal static class VerifyCommands
     }
 
     /// <summary>Exceptions and error-level logs since the deploy, from Log Analytics. Warns rather than fails: a restart can log a shutdown exception, and the
-    /// telemetry lags a few minutes, so a clean result right after a deploy is not proof - run <c>verify</c> again later.</summary>
-    private static VerifyOutcome CheckLoggedErrors(string name, Target target, Options options)
+    /// telemetry lags a few minutes, so a clean result right after a deploy is not proof - run <c>verify</c> again later. When the version endpoint says when the
+    /// running process started, only errors from then on count: a zip deploy copies the new files over the running app, and a request in that window can load a
+    /// half-written assembly (BadImageFormatException) - noise from the copy, not a fault of the build now serving.</summary>
+    private static VerifyOutcome CheckLoggedErrors(string name, Target target, Options options, DateTimeOffset? startedAt)
     {
         if (target.Workspace is null)
         {
@@ -100,23 +103,46 @@ internal static class VerifyCommands
         }
 
         var minutes = Math.Clamp(options.IntValue("--minutes") ?? SinceDeployMinutes(name), 5, 240);
+        var window = startedAt is { } start
+            ? string.Create(CultureInfo.InvariantCulture, $"since the process started at {start.UtcDateTime:HH:mm:ss} UTC")
+            : $"in the last {minutes} minutes";
         try
         {
-            var rows = PerfCommands.Query(target.Workspace,
-                $"union (AppExceptions | project TimeGenerated, AppRoleName, Kind='exception', Message=strcat(ExceptionType, ': ', substring(OuterMessage, 0, 100))), " +
-                $"(AppTraces | where SeverityLevel >= 3 | project TimeGenerated, AppRoleName, Kind='error log', Message=substring(Message, 0, 100)) " +
-                $"| where TimeGenerated > ago({minutes}m) and AppRoleName == '{target.App}' | summarize n=count() by Kind, Message | order by n desc | take 5");
+            var rows = PerfCommands.Query(target.Workspace, LoggedErrorsQuery(target.App, minutes, startedAt));
             if (rows.Count == 0)
             {
-                return new(VerifyResult.Pass, "errors logged since deploy", $"none in the last {minutes} minutes (telemetry lags a few minutes - run verify again later to be sure)");
+                return new(VerifyResult.Pass, "errors logged since deploy", $"none {window} (telemetry lags a few minutes - run verify again later to be sure)");
             }
 
             var top = string.Join("; ", rows.Select(r => $"{r.GetProperty("n").ToString()}x {r.GetProperty("Kind").GetString()} {r.GetProperty("Message").GetString()}"));
-            return new(VerifyResult.Warn, "errors logged since deploy", $"in the last {minutes} minutes: {top}");
+            return new(VerifyResult.Warn, "errors logged since deploy", $"{window}: {top}");
         }
         catch (InvalidOperationException ex)
         {
             return new(VerifyResult.Warn, "errors logged since deploy", "could not query the logs (is 'az login' current?): " + ex.Message.Split('\n')[0]);
+        }
+    }
+
+    /// <summary>The Log Analytics query for the app's exceptions and error logs: the last <paramref name="minutes"/>, and none before <paramref name="startedAt"/> when known.</summary>
+    internal static string LoggedErrorsQuery(string app, int minutes, DateTimeOffset? startedAt)
+    {
+        var since = startedAt is { } start ? string.Create(CultureInfo.InvariantCulture, $" and TimeGenerated >= datetime({start.UtcDateTime:yyyy-MM-ddTHH:mm:ss.fffZ})") : string.Empty;
+        return $"union (AppExceptions | project TimeGenerated, AppRoleName, Kind='exception', Message=strcat(ExceptionType, ': ', substring(OuterMessage, 0, 100))), " +
+            $"(AppTraces | where SeverityLevel >= 3 | project TimeGenerated, AppRoleName, Kind='error log', Message=substring(Message, 0, 100)) " +
+            $"| where TimeGenerated > ago({minutes}m){since} and AppRoleName == '{app}' | summarize n=count() by Kind, Message | order by n desc | take 5";
+    }
+
+    /// <summary>When the running process started, from the version endpoint's <c>startedAt</c>; null when it does not say.</summary>
+    internal static DateTimeOffset? TryStartedAt(string body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            return doc.RootElement.TryGetProperty("startedAt", out var value) && value.TryGetDateTimeOffset(out var started) ? started : null;
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+        {
+            return null;
         }
     }
 
