@@ -50,6 +50,9 @@ public sealed record MetadataAlbum
     public int? TrackCount { get; init; }
 }
 
+/// <summary>One track of an album as a service lists it: its disc (1 when the service gives none), its place on that disc, its title and length in milliseconds.</summary>
+public sealed record MetadataTrack(int DiscNumber, int TrackNumber, string Title, int? LengthMs);
+
 /// <summary>One artist as a search gives it.</summary>
 public sealed record MetadataArtist(string Id, string Name);
 

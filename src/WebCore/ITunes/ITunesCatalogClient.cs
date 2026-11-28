@@ -92,6 +92,17 @@ public sealed class ITunesCatalogClient : IAlbumMetadataSource
         return AlbumsAsync(LookupUrl + "id=" + Uri.EscapeDataString(artistId) + "&entity=album&limit=200", cancellationToken);
     }
 
+    /// <summary>An album's tracks by its iTunes collection id, in disc and track order. NotFound when iTunes lists no songs for it.</summary>
+    public async Task<MetadataResult<IReadOnlyList<MetadataTrack>>> GetAlbumTracksAsync(string collectionId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(collectionId);
+        var result = await GetAsync(LookupUrl + "id=" + Uri.EscapeDataString(collectionId) + "&entity=song&limit=200", cancellationToken).ConfigureAwait(false);
+        var tracks = Collect(result, IsSong, ParseTrack);
+        return tracks.Status != MetadataStatus.Ok
+            ? tracks
+            : new MetadataResult<IReadOnlyList<MetadataTrack>>(MetadataStatus.Ok, tracks.Data!.OrderBy(t => t.DiscNumber).ThenBy(t => t.TrackNumber).ToList());
+    }
+
     private async Task<MetadataResult<IReadOnlyList<MetadataAlbum>>> AlbumsAsync(string url, CancellationToken cancellationToken)
     {
         var result = await GetAsync(url, cancellationToken).ConfigureAwait(false);
@@ -237,6 +248,14 @@ public sealed class ITunesCatalogClient : IAlbumMetadataSource
             TrackCount = Count(element, "trackCount"),
         };
     }
+
+    // The song rows of a collection lookup; the first row is the album itself and is skipped.
+    private static bool IsSong(JsonElement element) => Text(element, "wrapperType") == "track" && Text(element, "kind") == "song";
+
+    private static MetadataTrack? ParseTrack(JsonElement element) =>
+        Count(element, "trackNumber") is { } number && Text(element, "trackName") is { } title
+            ? new MetadataTrack(Count(element, "discNumber") ?? 1, number, title, Count(element, "trackTimeMillis"))
+            : null;
 
     private static int? Count(JsonElement element, string name) =>
         element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var count) ? count : null;
